@@ -1,11 +1,10 @@
-# This configuration uses PAID compute and disk. Review Render's current quote before applying.
+# Free test deployment: filesystem and saved device pairings can reset.
 services:
   - type: web
     name: tydesk-broker
     runtime: python
-    plan: 0.5c-512mb
-    numInstances: 1
-    autoDeployTrigger: "off"
+    plan: free
+    autoDeployTrigger: commit
     buildCommand: pip install -r requirements-server.txt
     startCommand: python server.py
     healthCheckPath: /health
@@ -15,10 +14,6 @@ services:
       - key: TYDESK_HOST
         value: 0.0.0.0
       - key: TYDESK_DATA
-        value: /var/data/tydesk
+        value: /tmp/tydesk
       - key: PYTHON_VERSION
         value: 3.12.12
-    disk:
-      name: tydesk-data
-      mountPath: /var/data
-      sizeGB: 1
