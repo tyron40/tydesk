@@ -11,7 +11,7 @@ Original code with a browser controller, Windows companion, and self-hostable re
 - System playback audio capture using WASAPI loopback through SoundCard, with browser playback. No microphone capture. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
 - Bidirectional file transfer: browser uploads into `~/TyDesk/Inbox`; browser downloads only files the local user places in `~/TyDesk/Shared`. File transfers use a separate worker so they do not block screen uploads.
 - Persistent enrollment/revocation/file/disconnect event history, viewable in the dashboard.
-- Render Blueprint for HTTPS internet deployment with a persistent disk; Dockerfile and Docker Compose for self-hosting.
+- Free-plan Render deployment configuration; Dockerfile and Docker Compose for self-hosting.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
@@ -69,21 +69,27 @@ Limits: 20 MiB per file, 200 MiB aggregate broker storage, 100 outstanding trans
 
 ## Internet hosting — Render
 
-The source is published in the private repository https://github.com/tyron40/tydesk. The internet server has not been deployed. You do not need to run publish-github.ps1 for this repository.
+TyDesk is deployed at **https://tydesk-broker.onrender.com/** on Render's **free** compute plan in My Workspace. Source: private repository https://github.com/tyron40/tydesk. No paid compute or persistent disk was provisioned.
 
-Clone it on your Windows PC:
+### Use the hosted server from Windows
 
 ```powershell
 git clone https://github.com/tyron40/tydesk.git
 cd tydesk
-code .
+powershell -ExecutionPolicy Bypass -File .\\start-agent.ps1
 ```
 
-The Render workspace and hosting plan still need confirmation. The included render.yaml defines one Python web service, one instance, and a 1 GB persistent disk. Its compute and disk are paid resources; no paid service has been provisioned. The server password must be set privately as TYDESK_PASSWORD. A free test instance has ephemeral storage and loses enrollment when its filesystem resets.
+Open the hosted dashboard. Retrieve your server password from Render Dashboard → tydesk-broker → Environment → TYDESK_PASSWORD. It is deliberately not committed to source or repeated here. Unlock the dashboard and select Pair a computer. In the Windows companion, enter https://tydesk-broker.onrender.com as Server URL, paste the pairing code and enable the desired permissions. No local server is needed when using the hosted service.
 
-Before Blueprint deployment, validate `render.yaml` with `render blueprints validate render.yaml` if the Render CLI is installed. Its public JSON schema was also checked during development; CLI/platform validation and an actual deploy are separate remaining checks. The Blueprint must be committed/pushed. In Render Dashboard, create a Blueprint from that repository, authorize Git access, review costs, supply the password, and apply. Render provides the HTTPS URL. Confirm `/health` responds, then use the URL as the companion Server URL and create a new pairing code there.
+The live HTTPS deployment was checked for authentication rejection, authenticated pairing, frame transport, command delivery, audio chunk transport, bidirectional file transfer and revocation. The temporary check device was removed. These are server transport checks, not tests of Windows hardware or browser audio playback.
 
-An internet deployment uses outbound HTTPS from the companion. No inbound router forwarding is required on the controlled Windows PC. HTTPS encrypts transport to the broker. The broker can read screen/audio/files; this is **not** RustDesk-style end-to-end encryption against the relay. Single-owner password access is implemented; individual accounts/MFA are not.
+### Free-tier constraints
+
+The server uses an ephemeral filesystem with no disk. Saved device enrollment and temporary files are lost when Render resets that filesystem, including spin-downs, restarts and redeploys. Free services spin down after inactivity and take time to wake; usage limits are shared with the workspace's other free services. Bandwidth and build usage are metered at workspace level; exceeding included allowances can cause suspension or supplementary charges depending on account billing settings. This is a free-plan test deployment, not guaranteed zero-cost unlimited hosting or reliable always-on unattended access.
+
+The included render.yaml now matches free hosting, with no persistent disk. It declares the password as a secret placeholder and never embeds its value. The created service is managed directly in Render; do not apply a separate Blueprint to the same service without reviewing its settings.
+
+An internet deployment uses outbound HTTPS from the companion. No inbound router forwarding is required on the controlled Windows PC. HTTPS encrypts transport to the broker. The broker can read screen/audio/files; this is **not** end-to-end encryption against the relay. Single-owner password access is implemented; individual accounts/MFA are not.
 
 ## Self-host instead
 
@@ -97,7 +103,7 @@ An internet deployment uses outbound HTTPS from the companion. No inbound router
 
 Nine tests cover auth, pairing, command validation, device token isolation, audio chunk transport/permission, SQLite token storage, disconnect/revocation, path traversal rejection, and bidirectional file delivery over real HTTP with temporary files. Python compilation and dashboard JavaScript syntax were checked.
 
-These tests do not verify actual Windows capture/control, DPAPI, Task Scheduler startup, WASAPI audio drivers, browser audio playback, TLS proxy integration or an internet deployment. Those need your Windows machine and the hosted service. A full RustDesk replacement additionally needs native secure-desktop support, reliable encoding/streaming, keyboard layout handling, multi-monitor support, stronger authentication, E2EE, installation/signing, load/concurrency testing and an independent security review. Do not treat this development build as that finished product.
+These tests do not verify actual Windows capture/control, DPAPI, Task Scheduler startup, WASAPI audio drivers, browser audio playback, or a real Windows-to-browser internet session. Those need your Windows machine and the hosted service. A full RustDesk replacement additionally needs native secure-desktop support, reliable encoding/streaming, keyboard layout handling, multi-monitor support, stronger authentication, E2EE, installation/signing, load/concurrency testing and an independent security review. Do not treat this development build as that finished product.
 
 Primary display only; no drag gestures, held-key shortcuts, Ctrl+Alt+Delete, clipboard sync, Unicode typing or mobile companion. JPEG screen polling is a few frames per second. Device frames become unavailable after eight seconds offline. Existing viewers may retain their last displayed image until their next refresh. Move the local pointer to the top-left corner to trigger PyAutoGUI's emergency failsafe.
 
