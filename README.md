@@ -69,24 +69,17 @@ Limits: 20 MiB per file, 200 MiB aggregate broker storage, 100 outstanding trans
 
 ## Internet hosting — Render
 
-Render has been connected in the conversation, but **this package is not deployed**. The source must first exist in a GitHub repository Render can access. The connected GitHub tool cannot create repositories, so a local helper is included.
+The source is published in the private repository https://github.com/tyron40/tydesk. The internet server has not been deployed. You do not need to run publish-github.ps1 for this repository.
 
-Install Git and GitHub CLI if needed:
-
-```powershell
-winget install --id Git.Git -e
-winget install --id GitHub.cli -e
-```
-
-Restart VS Code after installation, then run in the extracted `tydesk` folder:
+Clone it on your Windows PC:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\publish-github.ps1
+git clone https://github.com/tyron40/tydesk.git
+cd tydesk
+code .
 ```
 
-It signs in if needed, initializes this folder, and creates a NEW PRIVATE `tydesk` repository in the signed-in account. It refuses an existing Git folder and will not overwrite an existing GitHub repository. Data, credentials and virtual environments are ignored. Review `git status` before a manual push. If Git requests your author name/email, set them and rerun the commit/push manually. Keep the GitHub repository private.
-
-Then provide the returned repository URL in the conversation. This is the missing source prerequisite for continuing Render deployment. The package's `render.yaml` defines one Python web service, one instance and a 1 GB persistent disk. It has auto-deploy disabled and prompts for `TYDESK_PASSWORD`; no actual password is in the source. **Its compute and disk are paid resources. Review Render's current quote before applying; no paid service was provisioned here.** A free ephemeral instance would lose SQLite enrollment on restarts/redeploys, so it is not equivalent to this persistent configuration.
+The Render workspace and hosting plan still need confirmation. The included render.yaml defines one Python web service, one instance, and a 1 GB persistent disk. Its compute and disk are paid resources; no paid service has been provisioned. The server password must be set privately as TYDESK_PASSWORD. A free test instance has ephemeral storage and loses enrollment when its filesystem resets.
 
 Before Blueprint deployment, validate `render.yaml` with `render blueprints validate render.yaml` if the Render CLI is installed. Its public JSON schema was also checked during development; CLI/platform validation and an actual deploy are separate remaining checks. The Blueprint must be committed/pushed. In Render Dashboard, create a Blueprint from that repository, authorize Git access, review costs, supply the password, and apply. Render provides the HTTPS URL. Confirm `/health` responds, then use the URL as the companion Server URL and create a new pairing code there.
 
