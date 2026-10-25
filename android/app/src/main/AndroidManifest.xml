@@ -6,7 +6,7 @@
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
- <application android:label="ZDesk" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false" android:icon="@android:drawable/ic_menu_view">
+ <application android:label="ZDesk" android:theme="@android:style/Theme.Material.NoActionBar" android:allowBackup="false" android:usesCleartextTraffic="false" android:icon="@drawable/zdesk_icon">
   <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
   <service android:name=".ShareService" android:exported="false" android:foregroundServiceType="mediaProjection|microphone|dataSync"/>
   <service android:name=".ControlService" android:label="ZDesk remote control" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
