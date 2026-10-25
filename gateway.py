@@ -1,12 +1,20 @@
 """ZDesk's new address forwards to the existing authoritative broker."""
 import os
 import threading
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 import requests
 from flask import Flask, Response, request, stream_with_context, render_template, jsonify
 
-# Fixed destination: clients can never select an arbitrary proxy target.
-UPSTREAM = 'https://tydesk-broker.onrender.com'
+# The destination is controlled by Render configuration, never a browser request.
+def backend_origin(value):
+    parsed = urlsplit(value)
+    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+            or parsed.path not in ('', '/') or parsed.query or parsed.fragment):
+        raise ValueError('ZDESK_BACKEND_URL must be an HTTPS origin without credentials or a path')
+    return value.rstrip('/')
+
+UPSTREAM = backend_origin(os.environ.get('ZDESK_BACKEND_URL', 'https://tydesk-broker.onrender.com'))
+DURABLE_DEVICES = os.environ.get('ZDESK_DURABLE_DEVICES', 'true').strip().lower() in ('true', '1', 'yes')
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 21 * 1024 * 1024
 local = threading.local()
@@ -14,12 +22,12 @@ local = threading.local()
 # Public pages and downloads are local so a sleeping broker cannot replace the
 # dashboard with Render's 502 page. The existing broker has a durable registry.
 from browser_routes import install as install_browser
-install_browser(app, durable_devices=True)
+install_browser(app, durable_devices=DURABLE_DEVICES)
 
 
 @app.get('/')
 def index():
-    return render_template('index.html', durable_devices=True)
+    return render_template('index.html', durable_devices=DURABLE_DEVICES)
 
 
 @app.after_request
@@ -40,7 +48,8 @@ def starting():
 
 @app.get('/healthz')
 def health():
-    return {'service': 'ZDesk gateway', 'ready': True}
+    return {'service': 'ZDesk gateway', 'ready': True,
+            'backend_configured': bool(os.environ.get('ZDESK_BACKEND_URL')), 'durable_devices': DURABLE_DEVICES}
 
 
 @app.route('/<path:path>', methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
