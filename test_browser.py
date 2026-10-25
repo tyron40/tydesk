@@ -8,8 +8,9 @@ class BrowserTests(unittest.TestCase):
   self.client=server.app.test_client()
  def test_companion_page_and_dashboard_choices(self):
   r=self.client.get('/companion');self.assertEqual(r.status_code,200)
-  self.assertIn(b'Share this computer',r.data);self.assertIn(b'getDisplayMedia',r.data)
-  self.assertIn(b'audio:false',r.data);self.assertIn(b"'X-Allow-Control':'no'",r.data)
+  self.assertIn(b'Share this computer',r.data);self.assertIn(b'getDisplayMedia',self.client.get('/static/browser-companion.js').data)
+  script=self.client.get('/static/browser-companion.js').data
+  self.assertIn(b'audio:false',script);self.assertIn(b"'X-Allow-Control':'no'",script)
   self.assertIn(b'/companion',self.client.get('/').data)
  def test_complete_download_and_no_credentials(self):
   r=self.client.get('/download/windows-source');self.assertEqual(r.status_code,200)

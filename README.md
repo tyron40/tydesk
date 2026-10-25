@@ -1,3 +1,9 @@
+## Android browser companion and multiple sessions
+
+Android browsers can share an explicitly permitted microphone and user-selected files while the page remains open. Screen sharing is offered only where getDisplayMedia exists; Chrome Android does not supply it. This browser companion cannot control Android apps or run unattended. Full Android remote screen/control requires a native Android app and is not implemented here. File transfers are limited to 20 MB and selected filenames; incoming files are saved by clicking a visible download link.
+
+For several computers, use Open in new window on each online device card. Each window has independent screen, input, audio and file UI. Browsers may open tabs instead or block pop-ups; open one window per click. Credentials are handed only to registered same-origin child windows in memory, never URL parameters or browser storage. Locking the parent dashboard locks its child session windows.
+
 ## Microphone sharing (3.2)
 
 The Windows companion has separate **System playback audio · PC sounds** and **Microphone · surrounding sound** checkboxes. Microphone access defaults off. Enabling it requires local confirmation; remembered microphone permission is stored only when Remember this computer is selected. The default Windows input device is used. Enable either source or both, then click **Listen to shared audio** in the dashboard. Windows desktop microphone permission and a working physical input device are required. Uncheck Microphone, Disconnect, or Quit ZDesk to stop microphone sharing. An in-flight audio upload cannot be recalled.
