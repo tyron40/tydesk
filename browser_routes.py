@@ -3,7 +3,7 @@ import os
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
-from flask import render_template, send_file
+from flask import render_template, send_file, abort
 ROOT=Path(__file__).resolve().parent
 FILES=['remote_input.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
        'requirements.txt','start-agent.ps1','install-startup.ps1','uninstall-startup.ps1','LICENSE']
@@ -14,7 +14,7 @@ def windows_exe():
 
 def install(app):
     @app.get('/companion')
-    def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),durable_devices=bool(os.environ.get('TYDESK_REGISTRY_URL')))
+    def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),android_app_available=(ROOT/'downloads'/'ZDesk-Android.apk').is_file(),durable_devices=bool(os.environ.get('TYDESK_REGISTRY_URL')))
     @app.get('/api/downloads')
     def download_info():
         exe=windows_exe()
@@ -24,6 +24,11 @@ def install(app):
         exe=windows_exe()
         if exe.is_file():return send_file(exe,mimetype='application/vnd.microsoft.portable-executable',as_attachment=True,download_name='ZDesk.exe')
         return download_source()
+    @app.get('/download/android')
+    def download_android():
+        apk=ROOT/'downloads'/'ZDesk-Android.apk'
+        if not apk.is_file():abort(503,description='The Android APK is still building. Try again shortly.')
+        return send_file(apk,mimetype='application/vnd.android.package-archive',as_attachment=True,download_name='ZDesk-Android.apk')
     @app.get('/download/windows-source')
     def download_source():
         payload=BytesIO()
