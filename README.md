@@ -1,3 +1,7 @@
+## Microphone sharing (3.2)
+
+The Windows companion has separate **System playback audio · PC sounds** and **Microphone · surrounding sound** checkboxes. Microphone access defaults off. Enabling it requires local confirmation; remembered microphone permission is stored only when Remember this computer is selected. The default Windows input device is used. Enable either source or both, then click **Listen to shared audio** in the dashboard. Windows desktop microphone permission and a working physical input device are required. Uncheck Microphone, Disconnect, or Quit TyDesk to stop microphone sharing. An in-flight audio upload cannot be recalled.
+
 # TyDesk v2 — Windows remote desktop development build
 
 Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first TyDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
@@ -10,7 +14,7 @@ Desktop control supports live pointer movement and cursor shape, left/right clic
 
 Phone/tablet layouts include larger controls, direct touch, tap, drag, hold-and-lift for right-click, two-finger scroll, relative trackpad mode, a keyboard text field, screen zoom and a fullscreen fallback. Pan / zoom view disables remote touch input so you can move the viewport. Browser/device combinations still require physical touch validation.
 
-System playback capture runs continuously while a separate bounded queue uploads short PCM WAV chunks. The browser plays PCM through Web Audio with volume, a level meter, resume handling and explicit silence/error status. The capture source remains the default Windows playback device, never a physical microphone. Play sound on that output device and enable system audio sharing locally before pressing Listen.
+System playback capture runs continuously while a separate bounded queue uploads short PCM WAV chunks. The browser plays PCM through Web Audio with volume, a level meter, resume handling and explicit silence/error status. The capture source remains the default Windows playback device, a physical microphone only when its separate local permission is enabled. Play sound on that output device and enable system audio sharing locally before pressing Listen.
 
 Validation includes 31 Python tests and browser logic tests for mouse/touch gestures, key release, a known audio tone, PCM decoding, playback scheduling, resume, volume and stop. Mocked and transport checks do not prove Windows audio drivers, audible phone output or physical touch behavior. Live screen polling is still JPEG over HTTPS, with network-dependent latency; no video codec/WebRTC or secure desktop support was added.
 
@@ -40,7 +44,7 @@ Source download remains at https://tydesk-broker.onrender.com/download/windows-s
 - Persistent broker device registry backed by Supabase on the hosted service, with SQLite as the local cache. The server stores a SHA-256 digest of each random device token, not the usable token.
 - Opt-in saved enrollment protected by the current Windows user's DPAPI. After initial pairing, no new prompt is required when Remember this device is enabled.
 - Opt-in Task Scheduler startup at Windows sign-in, in the current user's interactive desktop, with a companion window or opted-in tray icon. Connection loss triggers retries when saved reconnect is enabled. Revoked credentials stop retries.
-- System playback audio capture using WASAPI loopback through SoundCard, with browser playback. No microphone capture. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
+- System playback audio capture using WASAPI loopback through SoundCard, with browser playback. Separate opt-in microphone capture is available in version 3.2. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
 - Bidirectional file transfer: browser uploads into `~/TyDesk/Inbox`; browser downloads only files the local user places in `~/TyDesk/Shared`. File transfers use a separate worker so they do not block screen uploads.
 - Persistent enrollment/revocation/file/disconnect event history, viewable in the dashboard.
 - Free-plan Render deployment configuration; Dockerfile and Docker Compose for self-hosting.
