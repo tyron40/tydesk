@@ -5,3 +5,7 @@ __pycache__/
 data/
 *.log
 *.dat
+build/
+dist/
+*.spec
+windows-smoke.json
