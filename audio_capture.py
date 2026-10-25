@@ -45,25 +45,37 @@ def run(url,identity,token,stop,permission,report):
     def status(kind,message,level=0):
         with state_lock:state.update(state=kind,message=message[:160],level=level)
     def upload():
-        last_status=0;last_error=0
+        last_status=0;last_error=0;interrupted=False;backoff=.3
         with requests.Session() as session:
             session.headers['Authorization']='Bearer '+token
             while not stop.is_set() and not done.is_set() and permission.is_set():
                 try:
-                    if time.monotonic()-last_status>1:
-                        with state_lock:data=dict(state)
-                        r=session.post(f'{url}/api/devices/{identity}/audio-status',json=data,timeout=2)
-                        if r.status_code==401:stop.set();return
-                        last_status=time.monotonic()
                     try:stamp,payload=chunks.get(timeout=.2)
-                    except queue.Empty:continue
-                    if time.monotonic()-stamp>.8:continue
-                    r=session.post(f'{url}/api/devices/{identity}/audio',data=payload,headers={'Content-Type':'audio/wav'},timeout=2)
-                    if r.status_code==401:stop.set();return
-                    if r.status_code!=409:r.raise_for_status()
-                except requests.RequestException as exc:
-                    if time.monotonic()-last_error>5:report(('status','Audio connection interrupted; retrying. '+str(exc)[:90]));last_error=time.monotonic()
-                    stop.wait(.3)
+                    except queue.Empty:payload=None
+                    if stop.is_set() or done.is_set() or not permission.is_set():return
+                    if payload is not None:
+                        if time.monotonic()-stamp>.8:continue
+                        with state_lock:level=state['level']
+                        r=session.post(f'{url}/api/devices/{identity}/audio',data=payload,
+                            headers={'Content-Type':'audio/wav','X-Audio-Level':str(level)},timeout=(5,15))
+                        if r.status_code==401:stop.set();return
+                        if r.status_code==409:stop.wait(.3);continue
+                        r.raise_for_status()
+                        if interrupted:report(('status','System audio upload restored • screen sharing active'))
+                        interrupted=False;backoff=.3
+                    # Diagnostic failures must never prevent subsequent audio uploads.
+                    elif time.monotonic()-last_status>5:
+                        last_status=time.monotonic()
+                        with state_lock:data=dict(state)
+                        try:
+                            r=session.post(f'{url}/api/devices/{identity}/audio-status',json=data,timeout=(3,5))
+                            if r.status_code==401:stop.set();return
+                        except requests.RequestException:pass
+                except requests.RequestException:
+                    interrupted=True
+                    if time.monotonic()-last_error>5:
+                        report(('status','Audio upload delayed • reconnecting automatically. Screen sharing remains available.'));last_error=time.monotonic()
+                    stop.wait(backoff);backoff=min(3,backoff*2)
     sender=threading.Thread(target=upload,daemon=True);sender.start()
     cleanup_com=lambda:None
     try:

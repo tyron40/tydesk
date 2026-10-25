@@ -34,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='TyDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.1.1',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.1.2',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.

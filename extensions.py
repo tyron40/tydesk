@@ -1,5 +1,5 @@
 """Bounded audio buffer and explicit shared-folder file exchange."""
-import base64, io, re, secrets, shutil, time, wave
+import base64, io, re, secrets, shutil, time, wave, math
 from flask import request, jsonify, abort, Response
 MAX_FILE = 20 * 1024 * 1024
 MAX_TOTAL = 200 * 1024 * 1024
@@ -77,6 +77,11 @@ def install(app, admin, device, devices, lock, data_dir, audit):
                     if w.getnchannels()!=2 or w.getsampwidth()!=2 or w.getframerate()!=24000 or not 0<w.getnframes()<=12000: abort(400)
                     if len(w.readframes(w.getnframes()))!=w.getnframes()*4:abort(400)
             except (wave.Error,EOFError): abort(400)
+            if 'X-Audio-Level' in request.headers:
+                try:level=float(request.headers['X-Audio-Level'])
+                except ValueError:level=0
+                if not math.isfinite(level):level=0
+                d['audio_status']={'state':'capturing','message':'Receiving system playback audio','level':max(0,min(1,level)),'time':time.time()}
             d['audio_seq']+=1
             d['audio_chunks'].append((d['audio_seq'],time.time(),payload))
         return '',204

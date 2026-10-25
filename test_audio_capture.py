@@ -42,3 +42,39 @@ class BackendOrderTests(unittest.TestCase):
    backend,cleanup=audio_capture.load_audio_backend()
   self.assertEqual(order,['import','initialize']);self.assertIs(backend,fake)
 if __name__=='__main__':unittest.main()
+
+class UploadRecoveryTests(unittest.TestCase):
+ def exercise(self,fail_audio=False,fail_status=False):
+  import threading,time,requests
+  from unittest.mock import Mock,patch
+  import audio_capture
+  stop=threading.Event();permission=threading.Event();permission.set();reports=[];calls=[]
+  recorder=Mock();recorder.__enter__=Mock(return_value=recorder);recorder.__exit__=Mock(return_value=False)
+  def record(**kwargs):
+   time.sleep(.3 if fail_status else .02)
+   return np.zeros((4800,2))
+  recorder.record.side_effect=record
+  loop=Mock();loop.isloopback=True;loop.recorder.return_value=recorder
+  backend=Mock();backend.default_speaker.return_value=Mock(id='output',name='Test output');backend.get_microphone.return_value=loop
+  session=Mock();session.__enter__=Mock(return_value=session);session.__exit__=Mock(return_value=False);session.headers={}
+  attempts=0
+  def post(url,**kwargs):
+   nonlocal attempts
+   calls.append((url,kwargs))
+   if url.endswith('/audio-status'):
+    if fail_status:raise requests.ReadTimeout()
+    return Mock(status_code=204)
+   attempts+=1
+   if fail_audio and attempts==1:raise requests.ReadTimeout()
+   stop.set();return Mock(status_code=204)
+  session.post.side_effect=post
+  with patch.object(audio_capture,'load_audio_backend',return_value=(backend,lambda:None)),patch('requests.Session',return_value=session):
+   thread=threading.Thread(target=audio_capture.run,args=('https://test.invalid','device','test-token',stop,permission,reports.append))
+   thread.start();thread.join(5);stop.set();thread.join(1)
+  self.assertFalse(thread.is_alive());self.assertTrue(any(u.endswith('/audio') for u,k in calls));self.assertTrue(permission.is_set())
+  return reports,calls
+ def test_audio_timeout_recovers_without_clearing_permission(self):
+  reports,calls=self.exercise(fail_audio=True)
+  self.assertTrue(any('restored' in text for kind,text in reports))
+  self.assertTrue(all(k['timeout'][1]>=15 for u,k in calls if u.endswith('/audio')))
+ def test_diagnostics_timeout_does_not_block_audio(self):self.exercise(fail_status=True)
