@@ -30,5 +30,6 @@ class ControlServerTests(unittest.TestCase):
   self.assertEqual(self.c.post(self.path+'/audio',headers=self.auth,data=audio[:-16]).status_code,400)
  def test_static_modules_available_and_dashboard_renders(self):
   self.assertEqual(self.c.get('/').status_code,200)
-  for path in ['/static/remote-control.js','/static/system-audio.js']:self.assertEqual(self.c.get(path).status_code,200)
+  for path in ['/static/remote-control.js','/static/system-audio.js']:
+   with self.c.get(path) as response:self.assertEqual(response.status_code,200)
 if __name__=='__main__':unittest.main()

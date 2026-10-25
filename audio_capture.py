@@ -1,5 +1,5 @@
 """Continuous system playback capture; bounded upload queue, no physical microphone."""
-import io,threading,wave,queue,time
+import io,threading,wave,queue,time,sys
 
 def start(url,identity,token,stop,permission,report):
     thread=threading.Thread(target=run,args=(url,identity,token,stop,permission,report),daemon=True)
@@ -21,6 +21,17 @@ def newest(q,value):
         except queue.Empty:pass
         try:q.put_nowait(value)
         except queue.Full:pass
+
+def initialize_audio_thread():
+    """WASAPI requires COM on every capture thread, including after re-enabling audio."""
+    if sys.platform!='win32':return lambda:None
+    import ctypes
+    ole=ctypes.windll.ole32
+    ole.CoInitializeEx.argtypes=[ctypes.c_void_p,ctypes.c_uint32];ole.CoInitializeEx.restype=ctypes.c_long
+    result=ole.CoInitializeEx(None,0)
+    if result in (0,1):return ole.CoUninitialize
+    if result==-2147417850:return lambda:None # Existing COM apartment remains usable.
+    raise RuntimeError('Could not initialize Windows playback capture ('+str(result)+')')
 
 def run(url,identity,token,stop,permission,report):
     import requests
@@ -48,7 +59,9 @@ def run(url,identity,token,stop,permission,report):
                     if time.monotonic()-last_error>5:report(('status','Audio connection interrupted; retrying. '+str(exc)[:90]));last_error=time.monotonic()
                     stop.wait(.3)
     sender=threading.Thread(target=upload,daemon=True);sender.start()
+    cleanup_com=lambda:None
     try:
+        cleanup_com=initialize_audio_thread()
         import soundcard as sc
         while not stop.is_set() and permission.is_set():
             try:
@@ -70,4 +83,5 @@ def run(url,identity,token,stop,permission,report):
                 status('error',str(exc));report(('status','System audio: '+str(exc)[:140]));stop.wait(3)
     except Exception as exc:
         status('error',str(exc));report(('status','System audio unavailable: '+str(exc)[:140]));stop.wait(1.2)
-    finally:done.set();sender.join(timeout=3)
+    finally:
+        done.set();sender.join(timeout=3);cleanup_com()
