@@ -4,6 +4,7 @@ os.environ['TYDESK_PASSWORD']='test-password-long-enough'
 import server
 class BrokerTests(unittest.TestCase):
     def setUp(self):
+        server.enrollment_gate=server.connection_access.EnrollmentGate()
         self.c=server.app.test_client(); self.admin={'Authorization':'Bearer '+server.ADMIN}
         server.devices.clear(); server.pairings.clear();server.db.execute('DELETE FROM devices');server.db.commit()
     def enroll(self):

@@ -6,3 +6,4 @@ Pillow>=11,<13
 SoundCard>=0.4.3,<0.5
 numpy>=1.26,<3
 pywin32>=306; sys_platform == 'win32'
+pystray==0.19.5

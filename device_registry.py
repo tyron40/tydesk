@@ -13,3 +13,7 @@ def register(identity,token,name):
     if ENABLED:call('register',id=identity,token=token,name=name)
 def revoke(identity):
     if ENABLED:call('revoke',id=identity)
+
+def get_passcode():return call('get_settings').get('passcode_hash')
+def set_passcode(encoded):
+    if ENABLED:call('set_settings',passcode_hash=encoded)

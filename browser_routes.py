@@ -39,7 +39,7 @@ def install(app):
                 '4. Create a pairing code at https://tydesk-broker.onrender.com and paste it into the companion.\r\n'
                 '5. Enable the permissions you want and press Start / reconnect.\r\n\r\n'
                 'Optional sign-in startup: enable Remember this device, then run install-startup.ps1.\r\n'
-                'Remove startup with uninstall-startup.ps1. Close the visible app to stop sharing.\r\n'
+                'Remove startup with uninstall-startup.ps1. Disconnect or Quit TyDesk stops sharing. With tray mode enabled, closing the window keeps access available.\r\n'
                 'This package is source code, not a standalone EXE or signed installer.\r\n')
         payload.seek(0)
         return send_file(payload,mimetype='application/zip',as_attachment=True,download_name='TyDesk-Windows-Companion.zip')

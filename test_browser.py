@@ -3,7 +3,9 @@ os.environ.setdefault('TYDESK_PASSWORD','test-browser-password-long')
 os.environ.setdefault('TYDESK_DATA',tempfile.mkdtemp(prefix='tydesk-browser-tests-'))
 import server
 class BrowserTests(unittest.TestCase):
- def setUp(self):self.client=server.app.test_client()
+ def setUp(self):
+  server.enrollment_gate=server.connection_access.EnrollmentGate()
+  self.client=server.app.test_client()
  def test_companion_page_and_dashboard_choices(self):
   r=self.client.get('/companion');self.assertEqual(r.status_code,200)
   self.assertIn(b'Share this computer',r.data);self.assertIn(b'getDisplayMedia',r.data)

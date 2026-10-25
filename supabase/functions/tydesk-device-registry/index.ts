@@ -23,6 +23,14 @@ Deno.serve(async(req:Request)=>{
   const raw=await req.text();if(raw.length>4096)return Response.json({error:'Too large'},{status:413});
   const data=JSON.parse(raw);
   if(data.op==='list')return Response.json(await rest('tydesk_saved_devices?select=id,token,name&order=created_at.asc&limit=100'));
+  if(data.op==='get_settings'){
+   const rows=await rest('tydesk_connection_settings?id=eq.primary&select=passcode_hash');
+   return Response.json({passcode_hash:rows?.[0]?.passcode_hash||null});
+  }
+  if(data.op==='set_settings'){
+   if(data.passcode_hash!==null && !/^pbkdf2_sha256\$260000\$[a-f0-9]{32}\$[a-f0-9]{64}$/.test(data.passcode_hash||''))return Response.json({error:'Invalid setting'},{status:400});
+   await rest('tydesk_connection_settings','POST',{id:'primary',passcode_hash:data.passcode_hash});return Response.json({ok:true});
+  }
   if(!/^[a-f0-9]{24}$/.test(data.id||''))return Response.json({error:'Invalid device ID'},{status:400});
   if(data.op==='register'){
    if(!/^[a-f0-9]{64}$/.test(data.token||'')||typeof data.name!=='string'||data.name.length<1||data.name.length>80)return Response.json({error:'Invalid device'},{status:400});

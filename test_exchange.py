@@ -11,6 +11,7 @@ class Quiet(WSGIRequestHandler):
     def log(self,*args):pass
 class ExchangeTests(unittest.TestCase):
     def test_real_files_roundtrip(self):
+        server.enrollment_gate=server.connection_access.EnrollmentGate()
         http=make_server('127.0.0.1',0,server.app,threaded=True,request_handler=Quiet)
         thread=threading.Thread(target=http.serve_forever,daemon=True);thread.start()
         base='http://127.0.0.1:'+str(http.server_port);admin=requests.Session();agent=requests.Session()

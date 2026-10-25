@@ -2,11 +2,19 @@
 
 Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first TyDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
 
+## Companion 3.0: reusable passcode and tray mode
+
+The updated Windows companion uses a dark interface with connection, permission, and startup sections. A newly entered code always overrides an old saved enrollment. A revoked credential is cleared locally and prompts for a new connection; it is never silently re-enrolled.
+
+In the signed-in dashboard, use **One passcode. Your computers.** to set a reusable connection passcode of 16–128 characters. Paste it into each companion once and enable **Remember this computer and reconnect automatically**. One-use codes remain available. The server stores a salted PBKDF2 hash, limits enrollment attempts, and retains settings in the protected durable registry. Rotation/disable affects future enrollment; existing devices must be explicitly revoked.
+
+Enable **Keep available in the tray when I close this window** for window-close background access. The visible tray menu offers Open, Connect, Disconnect and Quit. Reopening the desktop shortcut brings back the existing window. Disconnect stops access; Quit stops the app. Enable sign-in startup separately for availability after Windows sign-in. The computer must stay awake; this does not add pre-login, lock-screen or UAC access.
+
 ## Standalone Windows application
 
 Download https://tydesk-broker.onrender.com/download/windows to get **TyDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add TyDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
 
-Pair once using a dashboard code and select **Pair once and remember this computer**. The local enrollment is encrypted with Windows DPAPI. Future app launches load it without another pairing code; click Start / reconnect, or explicitly enable **Start at Windows sign-in** for automatic reconnection. The app stays visible and retains Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
+Pair once using a dashboard code and select **Remember this computer and reconnect automatically**. The local enrollment is encrypted with Windows DPAPI. Future app launches reconnect with it without another pairing code. Enable sign-in startup for automatic launch when this Windows user signs in. The app stays available as a window or an opted-in tray icon, with Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
 
 **Permanent device storage is configured.** Render uses a protected Supabase registry in isolated TyDesk tables in the existing motivation project. Device identities and token hashes survive free-server filesystem resets; raw enrollment tokens stay on the Windows device. The unused extra database project was deleted. No additional database project or paid Render disk was added. Usage counts toward the existing account's allowances.
 
@@ -19,7 +27,7 @@ Source download remains at https://tydesk-broker.onrender.com/download/windows-s
 - Browser device dashboard, screen viewing, mouse clicks, basic keys, ASCII text, scrolling and revocation.
 - Persistent broker device registry backed by Supabase on the hosted service, with SQLite as the local cache. The server stores a SHA-256 digest of each random device token, not the usable token.
 - Opt-in saved enrollment protected by the current Windows user's DPAPI. After initial pairing, no new prompt is required when Remember this device is enabled.
-- Opt-in Task Scheduler startup at Windows sign-in, in the current user's interactive desktop, with a visible companion window. Connection loss triggers retries when saved reconnect is enabled. Revoked credentials stop retries.
+- Opt-in Task Scheduler startup at Windows sign-in, in the current user's interactive desktop, with a companion window or opted-in tray icon. Connection loss triggers retries when saved reconnect is enabled. Revoked credentials stop retries.
 - System playback audio capture using WASAPI loopback through SoundCard, with browser playback. No microphone capture. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
 - Bidirectional file transfer: browser uploads into `~/TyDesk/Inbox`; browser downloads only files the local user places in `~/TyDesk/Shared`. File transfers use a separate worker so they do not block screen uploads.
 - Persistent enrollment/revocation/file/disconnect event history, viewable in the dashboard.
@@ -73,7 +81,7 @@ To remove automatic startup:
 powershell -ExecutionPolicy Bypass -File .\uninstall-startup.ps1
 ```
 
-Disconnect stops the current connection; it does not erase your saved enrollment. **Forget saved enrollment** erases the local credential. Also use dashboard **Revoke** to remove server authorization. Closing the companion stops it; it does not conceal itself or resist removal.
+Disconnect stops the current connection; it does not erase your saved enrollment. **Forget saved enrollment** erases the local credential. Also use dashboard **Revoke** to remove server authorization. Closing the window keeps it running only when tray mode is enabled. Quit TyDesk stops the application.
 
 **This is not a system service. It cannot control Windows before sign-in, the lock screen, or UAC's secure desktop.** A native service and desktop-session integration are required for those capabilities. No Windows password is stored and Windows sign-in is not bypassed.
 

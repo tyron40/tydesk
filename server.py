@@ -1,6 +1,7 @@
 """TyDesk v2: persistent single-owner remote desktop broker."""
 import os, secrets, time, threading, math, sqlite3, hashlib
 import device_registry
+import connection_access
 from pathlib import Path
 from collections import deque
 from functools import wraps
@@ -30,6 +31,14 @@ if device_registry.ENABLED:
     db.executemany('INSERT INTO devices VALUES (?,?,?)',[(d['id'],d['token'],d['name']) for d in rows]);db.commit()
 devices = {identity: fresh(token,name) for identity,token,name in db.execute('SELECT * FROM devices')}
 
+db.execute('CREATE TABLE IF NOT EXISTS connection_settings (id TEXT PRIMARY KEY, passcode_hash TEXT)')
+if device_registry.ENABLED:
+    passcode_hash=device_registry.get_passcode()
+    db.execute("INSERT OR REPLACE INTO connection_settings VALUES ('primary',?)",(passcode_hash,));db.commit()
+else:
+    row=db.execute("SELECT passcode_hash FROM connection_settings WHERE id='primary'").fetchone()
+    passcode_hash=row[0] if row else None
+enrollment_gate=connection_access.EnrollmentGate()
 pairings = {}
 failed_auth = {}
 
@@ -81,14 +90,35 @@ def pairing():
         pairings[code] = now + 300
     return jsonify(code=code, expires_in=300)
 
+@app.route('/api/access-passcode',methods=['GET','PUT','DELETE'])
+@admin
+def access_passcode():
+    global passcode_hash
+    with lock:
+        if request.method=='GET':return jsonify(enabled=bool(passcode_hash),minimum_length=16)
+        encoded=None
+        if request.method=='PUT':
+            data=request.get_json(silent=True)
+            try:encoded=connection_access.encode(data.get('passcode') if isinstance(data,dict) else None)
+            except ValueError as e:abort(400,description=str(e))
+        try:device_registry.set_passcode(encoded)
+        except Exception:abort(503,description='Could not save connection settings. Try again shortly.')
+        db.execute("INSERT OR REPLACE INTO connection_settings VALUES ('primary',?)",(encoded,));db.commit()
+        passcode_hash=encoded
+        audit('dashboard','connection passcode changed' if encoded else 'connection passcode disabled')
+        return jsonify(enabled=bool(encoded),minimum_length=16)
+
 @app.post('/api/enroll')
 def enroll():
     data = request.get_json()
     if not isinstance(data,dict): abort(400)
+    if not enrollment_gate.permit(request.remote_addr or 'unknown'):abort(429)
     with lock:
         if len(devices)>=100: abort(429)
-        expires = pairings.pop(str(data.get('code', '')), 0)
-        if expires < time.time(): abort(403)
+        code=data.get('code','')
+        if not isinstance(code,str) or not 1<=len(code)<=200:abort(403)
+        expires = pairings.pop(code, 0)
+        if expires < time.time() and not connection_access.verify(code,passcode_hash): abort(403)
         identity, token = secrets.token_hex(12), secrets.token_urlsafe(32)
         name = str(data.get('name', 'Windows PC'))[:80] or 'Computer'
         digest = hashlib.sha256(token.encode()).hexdigest()
