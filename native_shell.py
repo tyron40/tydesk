@@ -47,6 +47,12 @@ $settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoing
 Unregister-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue
 Register-ScheduledTask -TaskName 'ZDesk Remote Access Companion' -Description 'Visible ZDesk companion; enabled by the local user.' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 '''
-    else:script="Unregister-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName 'ZDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue"
+    else:script="""$ErrorActionPreference='Stop'
+foreach ($name in @('TyDesk Remote Access Companion','ZDesk Remote Access Companion')) {
+  $task=Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
+  if ($task) { Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction Stop }
+}
+exit 0
+"""
     result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],env=env,capture_output=True,text=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
     if result.returncode:raise RuntimeError(result.stderr.strip()[:300] or 'Windows startup setup failed')
