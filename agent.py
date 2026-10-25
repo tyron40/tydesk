@@ -1,5 +1,5 @@
 """Visible Windows companion with opt-in saved enrollment and sign-in startup."""
-import io,platform,threading,time,queue,tkinter as tk,sys
+import io,platform,threading,time,queue,tkinter as tk,sys,json,tempfile
 from pathlib import Path
 from tkinter import messagebox
 from urllib.parse import urlparse
@@ -12,23 +12,26 @@ class Companion:
     def __init__(self,root):
         self.root=root;self.stop=threading.Event();self.allow=threading.Event();self.audio=threading.Event();self.files=threading.Event()
         self.events=queue.Queue();self.credentials=None;self.running=False
-        root.title('TyDesk • Remote access enabled only by you');root.geometry('620x610')
+        root.title('TyDesk • Remote access enabled only by you');root.geometry('640x700')
         tk.Label(root,text='TyDesk',font=('Segoe UI',26,'bold')).pack(pady=12)
         tk.Label(root,text='Screen sharing companion • close this window to stop').pack()
-        self.url=tk.StringVar(value='http://127.0.0.1:8787');self.code=tk.StringVar()
+        self.url=tk.StringVar(value='https://tydesk-broker.onrender.com');self.code=tk.StringVar()
         for label,var in [('Server URL',self.url),('One-use pairing code (first connection)',self.code)]:
             tk.Label(root,text=label).pack(pady=(10,0));tk.Entry(root,textvariable=var,width=68).pack()
         self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar()
         for text,var,event in [('Allow mouse and keyboard control',self.control,self.allow),('Share system playback audio (no microphone)',self.system_audio,self.audio),('Allow file exchange using TyDesk folders',self.file_permission,self.files)]:
             tk.Checkbutton(root,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e)).pack(anchor='w',padx=35,pady=3)
-        tk.Checkbutton(root,text='Remember this device and reconnect without another prompt',variable=self.unattended,command=self.remember_changed).pack(anchor='w',padx=35,pady=5)
+        tk.Checkbutton(root,text='Pair once and remember this computer',variable=self.unattended,command=self.remember_changed).pack(anchor='w',padx=35,pady=5)
         self.home=Path.home()/'TyDesk';self.home.mkdir(exist_ok=True)
         tk.Label(root,text='Files sent to this PC: '+str(self.home/'Inbox')+'\nFiles available to download: '+str(self.home/'Shared'),wraplength=570).pack(pady=7)
         self.status=tk.StringVar(value='Disconnected • no screen sharing');tk.Label(root,textvariable=self.status,wraplength=570).pack(pady=8)
         self.start=tk.Button(root,text='Start / reconnect',command=self.connect);self.start.pack()
         tk.Button(root,text='Disconnect',command=self.disconnect).pack(pady=5)
         tk.Button(root,text='Forget saved enrollment',command=self.forget).pack()
-        tk.Label(root,text='Sign-in startup: run install-startup.ps1 after pairing.\nBefore-login and secure-desktop access are not supported.',fg='#555').pack(pady=12)
+        tk.Button(root,text='Add TyDesk desktop shortcut',command=self.shortcut).pack(pady=5)
+        tk.Button(root,text='Enable start at Windows sign-in',command=self.enable_startup).pack(pady=3)
+        tk.Button(root,text='Disable start at Windows sign-in',command=self.disable_startup).pack(pady=3)
+        tk.Label(root,text='Keep the app in its current folder after creating a shortcut.\nBefore-login and secure-desktop access are not supported.',fg='#555').pack(pady=8)
         root.protocol('WM_DELETE_WINDOW',self.close);root.after(100,self.poll)
         try:
             saved=local_settings.load()
@@ -129,6 +132,24 @@ class Companion:
                 try:exchange(session,base,self.home/'Shared',self.home/'Inbox',self.files,stop)
                 except Exception as e:self.events.put(('status','File exchange: '+str(e)[:160]))
                 stop.wait(3)
+    def shortcut(self):
+        try:
+            import native_shell
+            native_shell.desktop_shortcut();self.status.set('TyDesk shortcut added to your desktop.')
+        except Exception as e:messagebox.showerror('Shortcut',str(e))
+    def enable_startup(self):
+        if not self.credentials or not self.unattended.get():
+            messagebox.showerror('Pair first','Pair once and enable Remember this computer first.');return
+        if not messagebox.askokcancel('Start at Windows sign-in?', 'TyDesk will open visibly and reconnect using your remembered screen/control/audio/file permissions whenever this Windows user signs in.'):return
+        try:
+            import native_shell
+            native_shell.startup(True);self.status.set('Windows sign-in startup enabled. The app remains visible.')
+        except Exception as e:messagebox.showerror('Startup',str(e))
+    def disable_startup(self):
+        try:
+            import native_shell
+            native_shell.startup(False);self.status.set('Windows sign-in startup disabled.')
+        except Exception as e:messagebox.showerror('Startup',str(e))
     def disconnect(self):self.stop.set();self.status.set('Disconnecting…')
     def forget(self):
         self.disconnect();local_settings.forget();self.credentials=None;self.unattended.set(False)
@@ -136,6 +157,20 @@ class Companion:
     def close(self):self.disconnect();self.root.after(500,self.root.destroy)
 
 if __name__=='__main__':
+    if '--self-test' in sys.argv:
+        output=Path(sys.argv[sys.argv.index('--self-test')+1])
+        try:
+            with tempfile.TemporaryDirectory() as temp:
+                local_settings.ROOT=Path(temp)
+                sample={'id':'build-smoke-test','token':'not-a-real-credential','url':'https://example.test'}
+                local_settings.save(sample);assert local_settings.load()==sample;local_settings.forget()
+            root=tk.Tk();root.withdraw();root.update();root.destroy()
+            import native_shell
+            import soundcard
+            output.write_text(json.dumps({'ok':True,'tk':True,'dpapi':True,'audio_module':True}))
+            sys.exit(0)
+        except Exception as exc:
+            output.write_text(json.dumps({'ok':False,'error':str(exc)}));sys.exit(1)
     # Single instance per Windows user: duplicate sign-in tasks cannot share twice.
     mutex=None
     if sys.platform=='win32':
