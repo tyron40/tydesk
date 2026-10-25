@@ -2,6 +2,18 @@
 
 Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first TyDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
 
+## Dashboard 3.1: mouse, touch and system audio
+
+Download the updated companion to enable protocol 2. The dashboard detects older companions and offers an update link; basic clicks remain compatible.
+
+Desktop control supports live pointer movement and cursor shape, left/right click, drag, wheel scrolling, focused keyboard input and common Ctrl shortcuts. Commands are batched, mouse movements are coalesced, and input polling runs independently of screen capture. Held buttons/keys are released on lost input, permission changes and disconnect; the companion applies a short hold lease.
+
+Phone/tablet layouts include larger controls, direct touch, tap, drag, hold-and-lift for right-click, two-finger scroll, relative trackpad mode, a keyboard text field, screen zoom and a fullscreen fallback. Pan / zoom view disables remote touch input so you can move the viewport. Browser/device combinations still require physical touch validation.
+
+System playback capture runs continuously while a separate bounded queue uploads short PCM WAV chunks. The browser plays PCM through Web Audio with volume, a level meter, resume handling and explicit silence/error status. The capture source remains the default Windows playback device, never a physical microphone. Play sound on that output device and enable system audio sharing locally before pressing Listen.
+
+Validation includes 31 Python tests and browser logic tests for mouse/touch gestures, key release, a known audio tone, PCM decoding, playback scheduling, resume, volume and stop. Mocked and transport checks do not prove Windows audio drivers, audible phone output or physical touch behavior. Live screen polling is still JPEG over HTTPS, with network-dependent latency; no video codec/WebRTC or secure desktop support was added.
+
 ## Companion 3.0: reusable passcode and tray mode
 
 The updated Windows companion uses a dark interface with connection, permission, and startup sections. A newly entered code always overrides an old saved enrollment. A revoked credential is cleared locally and prompts for a new connection; it is never silently re-enrolled.
@@ -133,7 +145,7 @@ Twelve tests cover auth, pairing, command validation, device token isolation, au
 
 These tests do not verify actual Windows capture/control, DPAPI, Task Scheduler startup, WASAPI audio drivers, browser audio playback, or a real Windows-to-browser internet session. Those need your Windows machine and the hosted service. A full RustDesk replacement additionally needs native secure-desktop support, reliable encoding/streaming, keyboard layout handling, multi-monitor support, stronger authentication, E2EE, installation/signing, load/concurrency testing and an independent security review. Do not treat this development build as that finished product.
 
-Primary display only; no drag gestures, held-key shortcuts, Ctrl+Alt+Delete, clipboard sync, Unicode typing or mobile companion. JPEG screen polling is a few frames per second. Device frames become unavailable after eight seconds offline. Existing viewers may retain their last displayed image until their next refresh. Move the local pointer to the top-left corner to trigger PyAutoGUI's emergency failsafe.
+Primary display only; no Ctrl+Alt+Delete, clipboard sync, Unicode typing or mobile companion. JPEG screen polling is a few frames per second. Device frames become unavailable after eight seconds offline. Existing viewers may retain their last displayed image until their next refresh. Move the local pointer to the top-left corner to trigger PyAutoGUI's emergency failsafe.
 
 ## License and references
 

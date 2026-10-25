@@ -5,7 +5,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from flask import render_template, send_file
 ROOT=Path(__file__).resolve().parent
-FILES=['agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
+FILES=['remote_input.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
        'requirements.txt','start-agent.ps1','install-startup.ps1','uninstall-startup.ps1','LICENSE']
 
 def install(app):

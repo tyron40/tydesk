@@ -6,7 +6,9 @@ from urllib.parse import urlparse
 import requests
 import pyautogui as pg
 import local_settings
+import remote_input
 pg.FAILSAFE=True
+pg.PAUSE=0
 
 class Companion:
     def __init__(self,root):
@@ -32,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='TyDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.0',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.1',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -122,6 +124,7 @@ class Companion:
             while True:
                 kind,text=self.events.get_nowait()
                 if kind=='action':getattr(self,text)();continue
+                if kind=='control_error':self.control.set(False);self.save()
                 if kind=='tray_error':self.background.set(False);self.tray=None;self.tray_ready.clear();self.show();self.save()
                 if kind=='credentials':self.credentials=text;self.code.set('');self.save();continue
                 if kind=='revoked':
@@ -145,13 +148,13 @@ class Companion:
         saved=self.credentials if not code and self.credentials and self.credentials['url']==url else None
         if not saved and not code:messagebox.showerror('Pairing','Paste a dashboard pairing code or your reusable connection passcode.');return
         if not (saved and self.unattended.get()) and not messagebox.askokcancel('Start screen sharing?', 'The dashboard owner can see your primary display. Only the checked permissions are enabled.'):return
-        self.stop=threading.Event();self.start.config(state='disabled');self.running=True
+        self.control_failure=None;self.stop=threading.Event();self.start.config(state='disabled');self.running=True
         threading.Thread(target=self.run,args=(url,code,saved,self.unattended.get()),daemon=True).start()
     def run(self,url,code,saved,retry):
         from file_exchange import run as exchange
         from audio_capture import start as start_audio
         stop=self.stop
-        client=requests.Session();credentials=saved;failure=None;audio_thread=None;file_thread=None
+        client=requests.Session();credentials=saved;failure=None;audio_thread=None;file_thread=None;input_thread=None
         try:
             if not credentials:
                 r=client.post(url+'/api/enroll',json={'code':code,'name':platform.node()},timeout=90)
@@ -160,32 +163,20 @@ class Companion:
                 r.raise_for_status()
                 credentials={**r.json(),'url':url};self.events.put(('credentials',credentials))
             identity=credentials['id'];client.headers['Authorization']='Bearer '+credentials['token'];base=f'{url}/api/devices/{identity}'
+            input_thread=threading.Thread(target=self.input_worker,args=(base,credentials['token'],stop),daemon=True);input_thread.start()
             self.events.put(('status','Sharing primary display • Disconnect to stop'))
             while not stop.is_set():
                 try:
                     shot=pg.screenshot();shot.thumbnail((1600,1000));buf=io.BytesIO();shot.convert('RGB').save(buf,'JPEG',quality=65)
                     if stop.is_set():break
-                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no'},timeout=8)
+                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape()},timeout=8)
                     if r.status_code==401:raise PermissionError('Saved connection no longer exists. Paste a new pairing code or your reusable passcode, then Connect.')
                     r.raise_for_status()
                     if self.audio.is_set() and (audio_thread is None or not audio_thread.is_alive()):
                         audio_thread=start_audio(url,identity,credentials['token'],stop,self.audio,self.events.put)
-                    r=client.get(base+'/commands',timeout=8)
-                    if r.status_code==401:raise PermissionError('Saved connection was revoked. Enter a new code or connection passcode.')
-                    r.raise_for_status()
-                    for c in r.json():
-                        if stop.is_set() or not self.allow.is_set():break
-                        if c['type']=='click':
-                            w,h=pg.size();pg.click(min(w-1,int(c['x']*w)),min(h-1,int(c['y']*h)),button=c['button'])
-                        elif c['type']=='text':
-                            for character in c['text']:
-                                if stop.is_set() or not self.allow.is_set():break
-                                pg.write(character,interval=.01)
-                        elif c['type']=='key':pg.press(c['key'])
-                        elif c['type']=='scroll':pg.scroll(c['amount'])
                     if self.files.is_set() and (file_thread is None or not file_thread.is_alive()):
                         file_thread=threading.Thread(target=self.file_worker,args=(base,credentials['token'],stop),daemon=True);file_thread.start()
-                    stop.wait(.25)
+                    stop.wait(.12)
                 except PermissionError:raise
                 except (requests.RequestException,OSError) as e:
                     if not retry:raise
@@ -195,12 +186,34 @@ class Companion:
         except Exception as e:failure='Stopped: '+str(e)[:220]
         finally:
             stop.set()
-            if audio_thread:audio_thread.join(timeout=6)
+            if input_thread:input_thread.join(timeout=2)
+            if audio_thread:audio_thread.join(timeout=2)
             if file_thread:file_thread.join(timeout=2)
             if credentials:
                 try:client.post(f"{url}/api/devices/{credentials['id']}/disconnect",timeout=5)
                 except requests.RequestException:pass
-            client.close();self.events.put(('done',failure or 'Disconnected. Click Start to reconnect.'))
+            client.close();self.events.put(('done',failure or getattr(self,'control_failure',None) or 'Disconnected. Click Start to reconnect.'))
+    def input_worker(self,base,token,stop):
+        controller=remote_input.Controller(pg)
+        with requests.Session() as session:
+            session.headers['Authorization']='Bearer '+token
+            try:
+                while not stop.is_set():
+                    if not self.allow.is_set():controller.release();stop.wait(.1);continue
+                    try:
+                        r=session.get(base+'/commands',timeout=(.75,.75))
+                        if r.status_code==401:
+                            self.events.put(('revoked','Saved connection revoked. Enter a new code.'));stop.set();break
+                        r.raise_for_status()
+                        for command in r.json():
+                            if stop.is_set() or not self.allow.is_set():break
+                            controller.apply(command)
+                        controller.tick()
+                    except requests.RequestException:controller.release()
+                    stop.wait(.04)
+            except Exception as exc:
+                self.allow.clear();self.control_failure='Stopped: remote control stopped. '+str(exc)[:140];self.events.put(('control_error',self.control_failure));stop.set()
+            finally:controller.release()
     def file_worker(self,base,token,stop):
         from file_exchange import run as exchange
         with requests.Session() as session:

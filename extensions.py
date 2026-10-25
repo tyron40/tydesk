@@ -55,6 +55,16 @@ def install(app, admin, device, devices, lock, data_dir, audit):
         return size
     @app.get('/health')
     def health(): return jsonify(status='ok',service='tydesk',version=2)
+    @app.post('/api/devices/<identity>/audio-status')
+    def audio_status(identity):
+        payload=request.get_json()
+        if not isinstance(payload,dict) or payload.get('state') not in ('waiting','capturing','error'):abort(400)
+        level=payload.get('level',0)
+        if not isinstance(level,(float,int)) or not 0<=level<=1:abort(400)
+        with lock:
+            d=device(identity)
+            d['audio_status']={'state':payload['state'],'message':str(payload.get('message',''))[:160],'level':level,'time':time.time()}
+        return '',204
     @app.post('/api/devices/<identity>/audio')
     def upload_audio(identity):
         with lock:
@@ -64,7 +74,8 @@ def install(app, admin, device, devices, lock, data_dir, audit):
             if len(payload)>100000: abort(413)
             try:
                 with wave.open(io.BytesIO(payload),'rb') as w:
-                    if w.getnchannels()!=2 or w.getsampwidth()!=2 or w.getframerate()!=24000 or w.getnframes()>12000: abort(400)
+                    if w.getnchannels()!=2 or w.getsampwidth()!=2 or w.getframerate()!=24000 or not 0<w.getnframes()<=12000: abort(400)
+                    if len(w.readframes(w.getnframes()))!=w.getnframes()*4:abort(400)
             except (wave.Error,EOFError): abort(400)
             d['audio_seq']+=1
             d['audio_chunks'].append((d['audio_seq'],time.time(),payload))
@@ -77,7 +88,9 @@ def install(app, admin, device, devices, lock, data_dir, audit):
         with lock:
             d=devices.get(identity)
             if not d or not d['audio'] or time.time()-d['seen']>=8: abort(409)
-            return jsonify(chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<2])
+            status=dict(d['audio_status'])
+            if status.get('time') and time.time()-status['time']>5:status={'state':'waiting','message':'No recent capture status; check the companion'}
+            return jsonify(status=status,chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<2])
     @app.post('/api/devices/<identity>/shares')
     def shares(identity):
         with lock:

@@ -2,6 +2,7 @@
 import os, secrets, time, threading, math, sqlite3, hashlib
 import device_registry
 import connection_access
+import remote_input
 from pathlib import Path
 from collections import deque
 from functools import wraps
@@ -23,7 +24,7 @@ def audit(identity, event):
     db.commit()
 def fresh(token, name):
     return dict(token=token, name=name, seen=0, frame=b'', commands=deque(maxlen=50), control=False,
-        audio=False, files=False, audio_chunks=deque(maxlen=8), audio_seq=0, share=[])
+        audio=False, files=False, audio_chunks=deque(maxlen=8), audio_seq=0, share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
 if device_registry.ENABLED:
     # Durable registry is authoritative. Never resurrect locally cached revocations.
     rows=device_registry.list_devices()
@@ -134,7 +135,7 @@ def enroll():
 def listing():
     with lock:
         return jsonify([dict(id=k, name=d['name'], online=time.time()-d['seen'] < 8,
-            control=d['control'], audio=d['audio'], files=d['files']) for k,d in devices.items()])
+            control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol']) for k,d in devices.items()])
 
 @app.post('/api/devices/<identity>/frame')
 def frame_upload(identity):
@@ -145,6 +146,8 @@ def frame_upload(identity):
         if len(payload)>3*1024*1024: abort(413)
         d['frame'] = payload
         d['seen'] = time.time()
+        d['protocol']=2 if request.headers.get('X-TyDesk-Protocol')=='2' else 1
+        cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'
         d['files'] = request.headers.get('X-Allow-Files') == 'yes'
@@ -158,7 +161,7 @@ def frame_download(identity):
     with lock:
         d = devices.get(identity)
         if not d or time.time()-d['seen'] >= 8 or not d['frame']: abort(404)
-        return Response(d['frame'], mimetype='image/jpeg')
+        return Response(d['frame'], mimetype='image/jpeg',headers={'X-Remote-Cursor':d['cursor']})
 
 @app.get('/api/devices/<identity>/commands')
 def commands(identity):
@@ -171,31 +174,20 @@ def commands(identity):
 @app.post('/api/devices/<identity>/commands')
 @admin
 def command(identity):
-    c = request.get_json()
-    if not isinstance(c, dict): abort(400)
-    kind = c.get('type')
-    if kind == 'click':
-        try:
-            x,y = float(c['x']),float(c['y'])
-            if not all(math.isfinite(v) and 0 <= v <= 1 for v in (x,y)): abort(400)
-        except (KeyError, ValueError, TypeError): abort(400)
-        c = dict(type='click', x=x, y=y, button='right' if c.get('button')=='right' else 'left')
-    elif kind == 'text':
-        text = c.get('text')
-        if not isinstance(text,str) or len(text)>500 or not text.isascii(): abort(400)
-        c = dict(type='text', text=text)
-    elif kind == 'key':
-        if c.get('key') not in ['enter','tab','backspace','esc','up','down','left','right','space']: abort(400)
-        c = dict(type='key', key=c['key'])
-    elif kind == 'scroll':
-        amount = c.get('amount')
-        if not isinstance(amount, (int,float)) or not math.isfinite(amount) or amount == 0: abort(400)
-        c = dict(type='scroll', amount=1 if amount>0 else -1)
-    else: abort(400)
+    payload=request.get_json()
+    batch=payload.get('commands') if isinstance(payload,dict) and 'commands' in payload else [payload]
+    if not isinstance(batch,list) or not 1<=len(batch)<=24:abort(400)
+    try:batch=[remote_input.validate(c) for c in batch]
+    except ValueError:abort(400)
     with lock:
-        d = devices.get(identity)
-        if not d or not d['control'] or time.time()-d['seen'] >= 8: abort(409)
-        d['commands'].append((time.time(),c))
+        d=devices.get(identity)
+        if not d or not d['control'] or time.time()-d['seen']>=8:abort(409)
+        for c in batch:
+            if c['type']=='release':d['commands'].clear()
+            if c['type']=='move' and d['commands'] and d['commands'][-1][1]['type']=='move':d['commands'].pop()
+            if len(d['commands'])>=49:
+                d['commands'].clear();d['commands'].append((time.time(),{'type':'release'}))
+            d['commands'].append((time.time(),c))
     return '',204
 
 @app.delete('/api/devices/<identity>')
