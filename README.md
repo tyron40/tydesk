@@ -2,6 +2,18 @@
 
 Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first TyDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
 
+## Standalone Windows application
+
+Download https://tydesk-broker.onrender.com/download/windows to get **TyDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add TyDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
+
+Pair once using a dashboard code and select **Pair once and remember this computer**. The local enrollment is encrypted with Windows DPAPI. Future app launches load it without another pairing code; click Start / reconnect, or explicitly enable **Start at Windows sign-in** for automatic reconnection. The app stays visible and retains Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
+
+**Permanent storage setup is pending.** The optional device_registry.py backend is implemented and tested, but is not configured on Render. A newly created database project unexpectedly quoted a paid fee and must be removed rather than used. Do not assume the free Render filesystem will retain the device list through resets until a no-new-project-cost registry is configured. No new registry secrets are in source or in the app download.
+
+The EXE was built on a Windows runner. The packaged app passed its Tk startup and DPAPI round-trip self-test. The live downloaded binary's SHA-256 was checked against downloads/windows-build.json. Physical Windows capture, audio hardware and sign-in startup still require testing on your PC.
+
+Source download remains at https://tydesk-broker.onrender.com/download/windows-source for users who prefer Python.
+
 ## Implemented
 
 - Browser device dashboard, screen viewing, mouse clicks, basic keys, ASCII text, scrolling and revocation.
@@ -19,7 +31,7 @@ Open https://tydesk-broker.onrender.com/companion on the computer you want to sh
 
 Browser mode has no OS mouse/keyboard control, system audio, file exchange or unattended startup. Screen-capture support varies by browser; unsupported browsers show an explanation. Screen permission is requested each time and capture is not saved across reloads. Browser sharing needs an actual desktop-browser/device test; server route and download tests do not prove screen capture works on every platform.
 
-For native features, use Download Windows companion ZIP on that page or https://tydesk-broker.onrender.com/download/windows. This direct download contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. Extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The bundled companion defaults to the hosted server. It is not a standalone EXE or a signed installer. The download contains no passwords, enrollment credentials, or server data.
+For native features, use Download TyDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. This direct download contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. Extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The bundled companion defaults to the hosted server. It is not a standalone EXE or a signed installer. The download contains no passwords, enrollment credentials, or server data.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
