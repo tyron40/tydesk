@@ -36,7 +36,7 @@ def install(app):
             for name in FILES:
                 content=(ROOT/name).read_bytes()
                 if name=='agent.py':
-                    content=content.replace(b'http://127.0.0.1:8787',b'https://tydesk-broker.onrender.com')
+                    content=content.replace(b'http://127.0.0.1:8787',b'https://zdesk-nnym.onrender.com')
                 archive.writestr('ZDesk-Companion/'+name,content)
             archive.writestr('ZDesk-Companion/Start-ZDesk.cmd',
                 '@echo off\r\ncd /d "%~dp0"\r\npowershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-agent.ps1"\r\npause\r\n')
@@ -45,7 +45,7 @@ def install(app):
                 '1. Install Python 3.12 or 3.13 from https://www.python.org/downloads/windows/ including the launcher and Tcl/Tk.\r\n'
                 '2. Extract ALL files into a permanent folder. Do not run from inside the ZIP.\r\n'
                 '3. Double-click Start-ZDesk.cmd. First launch downloads Python dependencies.\r\n'
-                '4. Create a pairing code at https://tydesk-broker.onrender.com and paste it into the companion.\r\n'
+                '4. Create a pairing code at https://zdesk-nnym.onrender.com and paste it into the companion.\r\n'
                 '5. Enable the permissions you want and press Start / reconnect.\r\n\r\n'
                 'Optional sign-in startup: enable Remember this device, then run install-startup.ps1.\r\n'
                 'Remove startup with uninstall-startup.ps1. Disconnect or Quit ZDesk stops sharing. With tray mode enabled, closing the window keeps access available.\r\n'

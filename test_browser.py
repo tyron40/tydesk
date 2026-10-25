@@ -22,7 +22,7 @@ class BrowserTests(unittest.TestCase):
     self.assertIn('ZDesk-Companion/'+name,names)
    self.assertTrue(all('data/' not in n and not n.endswith('.dat') for n in names))
    for n in names:self.assertNotIn(server.ADMIN.encode(),z.read(n))
-   agent=z.read('ZDesk-Companion/agent.py');self.assertIn(b'https://tydesk-broker.onrender.com',agent)
+   agent=z.read('ZDesk-Companion/agent.py');self.assertIn(b'https://zdesk-nnym.onrender.com',agent)
    self.assertNotIn(b'http://127.0.0.1:8787',agent)
  def test_revoked_browser_pairing_cannot_upload(self):
   admin={'Authorization':'Bearer '+server.ADMIN}

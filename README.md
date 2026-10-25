@@ -34,7 +34,7 @@ Enable **Keep available in the tray when I close this window** for window-close 
 
 ## Standalone Windows application
 
-Download https://tydesk-broker.onrender.com/download/windows to get **ZDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add ZDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
+Download https://zdesk-nnym.onrender.com/download/windows to get **ZDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add ZDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
 
 Pair once using a dashboard code and select **Remember this computer and reconnect automatically**. The local enrollment is encrypted with Windows DPAPI. Future app launches reconnect with it without another pairing code. Enable sign-in startup for automatic launch when this Windows user signs in. The app stays available as a window or an opted-in tray icon, with Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
 
@@ -42,7 +42,7 @@ Pair once using a dashboard code and select **Remember this computer and reconne
 
 The EXE was built on a Windows runner. The packaged app passed its Tk startup and DPAPI round-trip self-test. The live downloaded binary's SHA-256 was checked against downloads/windows-build.json. Physical Windows capture, audio hardware and sign-in startup still require testing on your PC.
 
-Source download remains at https://tydesk-broker.onrender.com/download/windows-source for users who prefer Python.
+Source download remains at https://zdesk-nnym.onrender.com/download/windows-source for users who prefer Python.
 
 ## Implemented
 
@@ -57,11 +57,11 @@ Source download remains at https://tydesk-broker.onrender.com/download/windows-s
 
 ## Browser companion and download choices
 
-Open https://tydesk-broker.onrender.com/companion on the computer you want to share. Create a pairing code from the signed-in dashboard, paste it into the browser companion, click Share this computer, and select a screen/window/tab in the browser's picker. The screen appears in the dashboard as a view-only device. Stop sharing from the page or the browser's own sharing indicator. Keep the page open; background throttling may slow updates.
+Open https://zdesk-nnym.onrender.com/companion on the computer you want to share. Create a pairing code from the signed-in dashboard, paste it into the browser companion, click Share this computer, and select a screen/window/tab in the browser's picker. The screen appears in the dashboard as a view-only device. Stop sharing from the page or the browser's own sharing indicator. Keep the page open; background throttling may slow updates.
 
 Browser mode has no OS mouse/keyboard control, system audio, file exchange or unattended startup. Screen-capture support varies by browser; unsupported browsers show an explanation. Screen permission is requested each time and capture is not saved across reloads. Browser sharing needs an actual desktop-browser/device test; server route and download tests do not prove screen capture works on every platform.
 
-For native features, use Download ZDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-ZDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-ZDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
+For native features, use Download ZDesk for Windows on that page or https://zdesk-nnym.onrender.com/download/windows. The source alternative is https://zdesk-nnym.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-ZDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-ZDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
@@ -119,7 +119,7 @@ Limits: 20 MiB per file, 200 MiB aggregate broker storage, 100 outstanding trans
 
 ## Internet hosting — Render
 
-ZDesk is deployed at **https://tydesk-broker.onrender.com/** on Render's **free** compute plan in My Workspace. Source: private repository https://github.com/tyron40/tydesk. No paid compute or persistent disk was provisioned.
+ZDesk is deployed at **https://zdesk-nnym.onrender.com/** on Render's **free** compute plan in My Workspace. Source: private repository https://github.com/tyron40/tydesk. No paid compute or persistent disk was provisioned.
 
 ### Use the hosted server from Windows
 
@@ -129,7 +129,7 @@ cd tydesk
 powershell -ExecutionPolicy Bypass -File .\\start-agent.ps1
 ```
 
-Open the hosted dashboard. Retrieve your server password from Render Dashboard → tydesk-broker → Environment → TYDESK_PASSWORD. It is deliberately not committed to source or repeated here. Unlock the dashboard and select Pair a computer. In the Windows companion, enter https://tydesk-broker.onrender.com as Server URL, paste the pairing code and enable the desired permissions. No local server is needed when using the hosted service.
+Open the hosted dashboard. Retrieve your server password from Render Dashboard → tydesk-broker → Environment → TYDESK_PASSWORD. It is deliberately not committed to source or repeated here. Unlock the dashboard and select Pair a computer. In the Windows companion, enter https://zdesk-nnym.onrender.com as Server URL, paste the pairing code and enable the desired permissions. No local server is needed when using the hosted service.
 
 The live HTTPS deployment was checked for authentication rejection, authenticated pairing, frame transport, command delivery, audio chunk transport, bidirectional file transfer and revocation. The temporary check device was removed. These are server transport checks, not tests of Windows hardware or browser audio playback.
 
@@ -166,3 +166,9 @@ Original ZDesk source: MIT; dependencies have their own licenses. Not affiliated
 - https://soundcard.readthedocs.io/en/latest/
 - https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtaskprincipal
 - https://learn.microsoft.com/en-us/windows/win32/api/dpapi/nf-dpapi-cryptprotectdata
+
+The branded address is a free gateway to the original authoritative broker. Existing companions configured with https://tydesk-broker.onrender.com continue to work, and all devices use the same dashboard registry and session state. The gateway and broker share the Render workspace free compute-hour and bandwidth allowances.
+
+### Remove a companion
+
+Update the native companion, connect with local control enabled, then select **Uninstall companion** on the device card or session toolbar. Android requests confirmation in the visible app and its system uninstaller. Windows confirms before disabling startup, removing desktop shortcuts and saved enrollment, then recycling the running portable EXE after exit. It preserves shared and received PC files. Revoke the dashboard pairing after verifying removal; revocation alone does not uninstall software. Offline devices and browser companions cannot be uninstalled from the dashboard.

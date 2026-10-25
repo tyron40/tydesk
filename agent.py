@@ -53,7 +53,7 @@ class Companion:
             return tk.Button(parent,text=text,command=command,bg=mint if primary else '#273a53',fg='#082b23' if primary else ink,
                 activebackground='#77eed2' if primary else '#334b69',activeforeground='#082b23' if primary else ink,
                 relief='flat',borderwidth=0,padx=15,pady=10,cursor='hand2',font=('Segoe UI',10,'bold'))
-        self.url=tk.StringVar(value='https://tydesk-broker.onrender.com');self.code=tk.StringVar()
+        self.url=tk.StringVar(value='https://zdesk-nnym.onrender.com');self.code=tk.StringVar()
         f=card('01  Connect this computer','Use a one-use code or your reusable connection passcode. Leave blank to reconnect a remembered device.')
         for label,var,secret in [('Server address',self.url,False),('Pairing code or connection passcode',self.code,True)]:
             tk.Label(f,text=label,bg=panel,fg=muted,font=('Segoe UI',9)).pack(anchor='w',pady=(4,4))
