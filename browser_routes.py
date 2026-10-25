@@ -1,17 +1,27 @@
 """Public browser companion page and credential-free Windows source download."""
+import os
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from flask import render_template, send_file
 ROOT=Path(__file__).resolve().parent
-FILES=['agent.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
+FILES=['agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
        'requirements.txt','start-agent.ps1','install-startup.ps1','uninstall-startup.ps1','LICENSE']
 
 def install(app):
     @app.get('/companion')
-    def companion():return render_template('companion.html')
+    def companion():return render_template('companion.html',windows_app_available=(ROOT/'downloads'/'TyDesk.exe').is_file(),durable_devices=bool(os.environ.get('TYDESK_REGISTRY_URL')))
+    @app.get('/api/downloads')
+    def download_info():
+        exe=ROOT/'downloads'/'TyDesk.exe'
+        return {'windows_app_available':exe.is_file(),'filename':'TyDesk.exe' if exe.is_file() else 'TyDesk-Windows-Companion.zip'}
     @app.get('/download/windows')
     def download():
+        exe=ROOT/'downloads'/'TyDesk.exe'
+        if exe.is_file():return send_file(exe,mimetype='application/vnd.microsoft.portable-executable',as_attachment=True,download_name='TyDesk.exe')
+        return download_source()
+    @app.get('/download/windows-source')
+    def download_source():
         payload=BytesIO()
         with ZipFile(payload,'w',ZIP_DEFLATED) as archive:
             for name in FILES:
