@@ -13,6 +13,14 @@ Original code with a browser controller, Windows companion, and self-hostable re
 - Persistent enrollment/revocation/file/disconnect event history, viewable in the dashboard.
 - Free-plan Render deployment configuration; Dockerfile and Docker Compose for self-hosting.
 
+## Browser companion and download choices
+
+Open https://tydesk-broker.onrender.com/companion on the computer you want to share. Create a pairing code from the signed-in dashboard, paste it into the browser companion, click Share this computer, and select a screen/window/tab in the browser's picker. The screen appears in the dashboard as a view-only device. Stop sharing from the page or the browser's own sharing indicator. Keep the page open; background throttling may slow updates.
+
+Browser mode has no OS mouse/keyboard control, system audio, file exchange or unattended startup. Screen-capture support varies by browser; unsupported browsers show an explanation. Screen permission is requested each time and capture is not saved across reloads. Browser sharing needs an actual desktop-browser/device test; server route and download tests do not prove screen capture works on every platform.
+
+For native features, use Download Windows companion ZIP on that page or https://tydesk-broker.onrender.com/download/windows. This direct download contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. Extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The bundled companion defaults to the hosted server. It is not a standalone EXE or a signed installer. The download contains no passwords, enrollment credentials, or server data.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.
@@ -98,10 +106,10 @@ An internet deployment uses outbound HTTPS from the companion. No inbound router
 ## Validation and remaining gaps
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest -v test_server.py test_exchange.py
+.\.venv\Scripts\python.exe -m unittest -v test_server.py test_exchange.py test_browser.py
 ```
 
-Nine tests cover auth, pairing, command validation, device token isolation, audio chunk transport/permission, SQLite token storage, disconnect/revocation, path traversal rejection, and bidirectional file delivery over real HTTP with temporary files. Python compilation and dashboard JavaScript syntax were checked.
+Twelve tests cover auth, pairing, command validation, device token isolation, audio chunk transport/permission, SQLite token storage, disconnect/revocation, path traversal rejection, and bidirectional file delivery over real HTTP with temporary files, browser-page availability, credential-free download contents, and revoked browser pairing behavior. Python compilation and dashboard JavaScript syntax were checked.
 
 These tests do not verify actual Windows capture/control, DPAPI, Task Scheduler startup, WASAPI audio drivers, browser audio playback, or a real Windows-to-browser internet session. Those need your Windows machine and the hosted service. A full RustDesk replacement additionally needs native secure-desktop support, reliable encoding/streaming, keyboard layout handling, multi-monitor support, stronger authentication, E2EE, installation/signing, load/concurrency testing and an independent security review. Do not treat this development build as that finished product.
 
