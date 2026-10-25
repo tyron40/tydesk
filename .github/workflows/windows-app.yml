@@ -18,7 +18,7 @@ permissions:
   contents: write
 concurrency:
   group: windows-companion
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   windows-app:
     runs-on: windows-latest
@@ -55,7 +55,7 @@ jobs:
           New-Item -ItemType Directory -Force downloads | Out-Null
           Copy-Item dist/TyDesk.exe downloads/TyDesk.exe -Force
           $hash = (Get-FileHash downloads/TyDesk.exe -Algorithm SHA256).Hash.ToLower()
-          @{ sha256 = $hash; source_commit = '${{ github.sha }}'; architecture = 'windows-x64'; unsigned = $true } | ConvertTo-Json | Set-Content downloads/windows-build.json
+          @{ sha256 = $hash; source_commit = (git rev-parse HEAD); architecture = 'windows-x64'; unsigned = $true } | ConvertTo-Json | Set-Content downloads/windows-build.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add downloads/TyDesk.exe downloads/windows-build.json
