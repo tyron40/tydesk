@@ -269,6 +269,8 @@ if __name__=='__main__':
             root=tk.Tk();root.withdraw();root.update();root.destroy()
             import native_shell
             import soundcard
+            import numpy as np
+            assert len(np.fromstring(b'\x00'*8,dtype=np.float32))==2,'WASAPI NumPy compatibility check failed'
             import pystray
             test_root=tk.Tk();test_app=Companion(test_root);test_root.update();test_app.ensure_tray()
             assert test_app.tray_ready.wait(10),'Tray failed to initialize'
