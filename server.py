@@ -6,7 +6,7 @@ import remote_input
 from pathlib import Path
 from collections import deque
 from functools import wraps
-from flask import Flask, request, jsonify, abort, render_template, Response
+from flask import Flask, request, jsonify, abort, render_template, Response, redirect
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 21 * 1024 * 1024
 ADMIN = os.environ.get('TYDESK_PASSWORD', '')
@@ -72,6 +72,19 @@ def headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; media-src 'self' blob:; frame-ancestors 'none'"
     return response
+
+@app.before_request
+def canonical_browser_address():
+    # Only browser page navigations move addresses. Native API traffic stays on
+    # the original broker, and the gateway does not forward Sec-Fetch headers.
+    if (request.method in ('GET', 'HEAD') and request.host.split(':')[0] == 'tydesk-broker.onrender.com'
+            and request.path in ('/', '/companion')
+            and request.headers.get('Sec-Fetch-Mode') == 'navigate'):
+        from urllib.parse import urlencode
+        target = 'https://zdesk-nnym.onrender.com' + request.path
+        if request.args:
+            target += '?' + urlencode(list(request.args.items(multi=True)))
+        return redirect(target, code=302)
 
 @app.get('/')
 def index(): return render_template('index.html',durable_devices=device_registry.ENABLED)
