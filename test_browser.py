@@ -10,7 +10,7 @@ class BrowserTests(unittest.TestCase):
   self.assertIn(b'audio:false',r.data);self.assertIn(b"'X-Allow-Control':'no'",r.data)
   self.assertIn(b'/companion',self.client.get('/').data)
  def test_complete_download_and_no_credentials(self):
-  r=self.client.get('/download/windows');self.assertEqual(r.status_code,200)
+  r=self.client.get('/download/windows-source');self.assertEqual(r.status_code,200)
   self.assertIn('attachment;',r.headers['Content-Disposition'])
   with zipfile.ZipFile(io.BytesIO(r.data)) as z:
    names=z.namelist();self.assertIn('TyDesk-Companion/Start-TyDesk.cmd',names)
