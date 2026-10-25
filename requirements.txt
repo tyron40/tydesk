@@ -4,6 +4,6 @@ requests>=2.32,<3
 PyAutoGUI>=0.9.54,<1
 Pillow>=11,<13
 SoundCard>=0.4.3,<0.5
-numpy>=1.26,<3
+numpy>=1.26,<2.3
 pywin32>=306; sys_platform == 'win32'
 pystray==0.19.5
