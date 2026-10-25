@@ -146,7 +146,7 @@ def frame_upload(identity):
         if len(payload)>3*1024*1024: abort(413)
         d['frame'] = payload
         d['seen'] = time.time()
-        d['protocol']=2 if request.headers.get('X-ZDesk-Protocol')=='2' else 1
+        d['protocol']=2 if request.headers.get('X-TyDesk-Protocol')=='2' else 1
         cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'
