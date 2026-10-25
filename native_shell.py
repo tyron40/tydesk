@@ -2,6 +2,25 @@
 import os,sys,subprocess
 from pathlib import Path
 
+def remove_companion():
+    """Recycle this portable executable after it exits; never delete user folders."""
+    if os.name!='nt' or not getattr(sys,'frozen',False):
+        raise RuntimeError('Automatic removal is available only in the packaged Windows app.')
+    startup(False)
+    import win32com.client
+    shell=win32com.client.Dispatch('WScript.Shell')
+    for name in ('ZDesk.lnk','TyDesk.lnk'):
+        (Path(shell.SpecialFolders('Desktop'))/name).unlink(missing_ok=True)
+    script="""$ErrorActionPreference='Stop'
+Wait-Process -Id ([int]$env:ZDESK_REMOVE_PID) -Timeout 45 -ErrorAction SilentlyContinue
+if (Get-Process -Id ([int]$env:ZDESK_REMOVE_PID) -ErrorAction SilentlyContinue) { exit 1 }
+Add-Type -AssemblyName Microsoft.VisualBasic
+[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($env:ZDESK_REMOVE_EXE, [Microsoft.VisualBasic.FileIO.UIOption]::AllDialogs, [Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)
+"""
+    env={**os.environ,'ZDESK_REMOVE_PID':str(os.getpid()),'ZDESK_REMOVE_EXE':str(Path(sys.executable).resolve())}
+    subprocess.Popen(['powershell.exe','-NoProfile','-Command',script],env=env,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP|subprocess.DETACHED_PROCESS,close_fds=True)
+
 def target():
     if getattr(sys,'frozen',False):return Path(sys.executable),'--autostart'
     return Path(sys.executable).with_name('pythonw.exe'),'"'+str(Path(__file__).with_name('agent.py'))+'" --autostart'

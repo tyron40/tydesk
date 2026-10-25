@@ -30,4 +30,12 @@ class CompanionTests(unittest.TestCase):
   a.events.put(('revoked','Saved connection was revoked.'));a.events.put(('done','Stopped: enter a new code'))
   with patch('agent.local_settings.forget') as forget:
    a.poll();forget.assert_called_once();self.assertIsNone(a.credentials)
+ def test_uninstall_cancel_keeps_app_and_pairing(self):
+  a=self.app();a.running=True;a.allow.set();a.show=Mock()
+  with patch('agent.messagebox.askyesno',return_value=False),patch('agent.threading.Thread') as thread,patch('agent.local_settings.forget') as forget:
+   a.confirm_uninstall({'id':'request'});forget.assert_not_called();self.assertFalse(a.stop.is_set());thread.assert_called_once()
+ def test_uninstall_never_runs_without_local_control(self):
+  a=self.app();a.running=True;a.show=Mock()
+  with patch('agent.messagebox.askyesno') as confirm:
+   a.confirm_uninstall({'id':'request'});confirm.assert_not_called()
 if __name__=='__main__':unittest.main()

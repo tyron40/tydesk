@@ -34,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='ZDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.2',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.3',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -130,6 +130,7 @@ class Companion:
                 if kind=='control_error':self.control.set(False);self.save()
                 if kind=='tray_error':self.background.set(False);self.tray=None;self.tray_ready.clear();self.show();self.save()
                 if kind=='credentials':self.credentials=text;self.code.set('');self.save();continue
+                if kind=='uninstall':self.confirm_uninstall(text);continue
                 if kind=='revoked':
                     self.credentials=None;local_settings.forget();self.show()
                 if kind=='done':self.show() if text.startswith('Stopped:') else None
@@ -172,7 +173,7 @@ class Companion:
                 try:
                     shot=pg.screenshot();shot.thumbnail((1600,1000));buf=io.BytesIO();shot.convert('RGB').save(buf,'JPEG',quality=65)
                     if stop.is_set():break
-                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape()},timeout=8)
+                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape(),'X-Companion-Platform':'windows','X-Companion-Removal':'1' if getattr(sys,'frozen',False) else '0'},timeout=8)
                     if r.status_code==401:raise PermissionError('Saved connection no longer exists. Paste a new pairing code or your reusable passcode, then Connect.')
                     r.raise_for_status()
                     if (self.audio.is_set() or self.mic.is_set()) and (audio_thread is None or not audio_thread.is_alive()):
@@ -198,12 +199,17 @@ class Companion:
             client.close();self.events.put(('done',failure or getattr(self,'control_failure',None) or 'Disconnected. Click Start to reconnect.'))
     def input_worker(self,base,token,stop):
         controller=remote_input.Controller(pg)
+        management_at=0
         with requests.Session() as session:
             session.headers['Authorization']='Bearer '+token
             try:
                 while not stop.is_set():
                     if not self.allow.is_set():controller.release();stop.wait(.1);continue
                     try:
+                        if time.monotonic()-management_at>1:
+                            management_at=time.monotonic()
+                            removal=session.get(base+'/removal',timeout=(.75,.75))
+                            if removal.ok and removal.json():self.events.put(('uninstall',removal.json()))
                         r=session.get(base+'/commands',timeout=(.75,.75))
                         if r.status_code==401:
                             self.events.put(('revoked','Saved connection revoked. Enter a new code.'));stop.set();break
@@ -230,6 +236,25 @@ class Companion:
             import native_shell
             native_shell.desktop_shortcut();self.status.set('ZDesk shortcut added to your desktop.')
         except Exception as e:messagebox.showerror('Shortcut',str(e))
+    def confirm_uninstall(self,job):
+        if not self.running or not self.allow.is_set() or not self.credentials:return
+        self.show()
+        credentials=dict(self.credentials)
+        base=credentials['url']+'/api/devices/'+credentials['id']+'/removal'
+        def report(state):
+            def send():
+                try:requests.post(base,headers={'Authorization':'Bearer '+credentials['token']},json={'id':job['id'],'state':state},timeout=8)
+                except requests.RequestException:pass
+            threading.Thread(target=send,daemon=False).start()
+        if not messagebox.askyesno('Uninstall ZDesk?', 'Your dashboard requested removal of this companion. Remove its sign-in startup, desktop shortcuts and saved pairing, then move this running EXE to the Recycle Bin? Shared and received files stay on this PC.'):
+            report('cancelled');return
+        try:
+            import native_shell
+            native_shell.remove_companion()
+            self.stop.set();local_settings.forget();self.credentials=None;self.unattended.set(False)
+            report('removal_started');self.status.set('Removing ZDesk. Check the Recycle Bin to verify removal.');self.quit()
+        except Exception as e:
+            report('failed');messagebox.showerror('Removal failed',str(e))
     def enable_startup(self):
         if not self.credentials or not self.unattended.get():
             messagebox.showerror('Pair first','Pair once and enable Remember this computer first.');return

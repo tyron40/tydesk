@@ -13,3 +13,7 @@ File access is limited to user-selected document URIs and the app's private Inbo
 This first APK is a development build, not a Play Store production release. A stable private release signing key must be configured for reliable long-term updates. A changed development key requires reinstalling, which removes local pairing. Review Android's installation and accessibility permission screens; do not disable security protections.
 
 Build: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug. Hardware screen capture, OEM accessibility and audible microphone playback still require real-device testing.
+
+## Dashboard uninstall requests
+
+Version 1.1 advertises uninstall support while sharing with control enabled. The dashboard device card and session toolbar can request removal. Open ZDesk or tap its active notification within two minutes to review the request. Android shows its normal uninstall confirmation after ZDesk stops capture and disables its accessibility service. Cancelling keeps the app installed; start sharing again if desired. Android uninstallation removes private app data and received Inbox files, so export received files first. Revoke the dashboard pairing after verifying removal. Offline devices and older builds cannot receive uninstall requests.

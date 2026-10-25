@@ -11,10 +11,10 @@ import android.widget.*;
 import org.json.*;
 import java.io.*;
 public class MainActivity extends Activity {
- EditText server,code;CheckBox screen,mic,control,files;TextView status;String lastStatus="";Button start;java.io.File export;
+ EditText server,code;CheckBox screen,mic,control,files;TextView status;String lastStatus="";Button start;java.io.File export;boolean reviewingRemoval=false;
  final Handler handler=new Handler(Looper.getMainLooper());
  public void onCreate(Bundle state){super.onCreate(state);getWindow().setStatusBarColor(0xff101b2b);ScrollView scroll=new ScrollView(this);LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setPadding(32,36,32,36);layout.setBackgroundColor(0xff101b2b);scroll.addView(layout);setContentView(scroll);int padding=Math.round(20*getResources().getDisplayMetrics().density);scroll.setOnApplyWindowInsetsListener((v,insets)->{int top=insets.getSystemWindowInsetTop(),bottom=insets.getSystemWindowInsetBottom();layout.setPadding(padding,padding+top,padding,padding+bottom);return insets;});
-  label(layout,"ZDesk",32);label(layout,"ANDROID COMPANION · 1.0",12);label(layout,"Connect your phone. Stay in control.",21);
+  label(layout,"ZDesk",32);label(layout,"ANDROID COMPANION · 1.1",12);label(layout,"Connect your phone. Stay in control.",21);
   label(layout,"Server address",14);server=new EditText(this);server.setSingleLine();server.setText(getPreferences(0).getString("server","https://tydesk-broker.onrender.com"));layout.addView(server);
   label(layout,"Connection passcode or one-use code (blank to use saved pairing)",14);code=new EditText(this);code.setSingleLine();code.setInputType(129);layout.addView(code);
   screen=option(layout,"Share screen · Android approval required each session",true);mic=option(layout,"Share microphone / surrounding sound",false);control=option(layout,"Allow remote taps, swipes and text",false);files=option(layout,"Exchange selected files · up to 20 MB",false);
@@ -29,8 +29,26 @@ public class MainActivity extends Activity {
  TextView label(LinearLayout l,String text,int size){TextView v=new TextView(this);v.setText(text);v.setTextSize(size);v.setTextColor(0xffdcecf9);v.setPadding(0,12,0,14);l.addView(v);return v;}
  CheckBox option(LinearLayout l,String title,boolean checked){CheckBox c=new CheckBox(this);c.setText(title);c.setTextColor(0xffe9f6ff);c.setChecked(checked);l.addView(c);return c;}
  Button button(LinearLayout l,String title,Runnable action){Button b=new Button(this);b.setText(title);b.setOnClickListener(v->action.run());l.addView(b);return b;}
- protected void onResume(){super.onResume();handler.post(new Runnable(){public void run(){if(ShareService.active){control.setChecked(getSharedPreferences("options",0).getBoolean("control",false));screen.setChecked(ShareService.projectionActive);mic.setChecked(getSharedPreferences("options",0).getBoolean("mic",false));files.setChecked(getSharedPreferences("options",0).getBoolean("files",false));}screen.setEnabled(!ShareService.active);mic.setEnabled(!ShareService.active);files.setEnabled(!ShareService.active);control.setEnabled(!ShareService.active);String serviceStatus=getSharedPreferences("options",0).getString("status","Ready · nothing is shared until Start and Android approval.");if(status!=null&&(ShareService.active||!serviceStatus.equals(lastStatus))){status.setText(serviceStatus);lastStatus=serviceStatus;}handler.postDelayed(this,1500);}});}
+ protected void onResume(){super.onResume();handler.post(new Runnable(){public void run(){reviewRemoval();if(ShareService.active){control.setChecked(getSharedPreferences("options",0).getBoolean("control",false));screen.setChecked(ShareService.projectionActive);mic.setChecked(getSharedPreferences("options",0).getBoolean("mic",false));files.setChecked(getSharedPreferences("options",0).getBoolean("files",false));}screen.setEnabled(!ShareService.active);mic.setEnabled(!ShareService.active);files.setEnabled(!ShareService.active);control.setEnabled(!ShareService.active);String serviceStatus=getSharedPreferences("options",0).getString("status","Ready · nothing is shared until Start and Android approval.");if(status!=null&&(ShareService.active||!serviceStatus.equals(lastStatus))){status.setText(serviceStatus);lastStatus=serviceStatus;}handler.postDelayed(this,1500);}});}
  protected void onPause(){handler.removeCallbacksAndMessages(null);super.onPause();}
+ void reviewRemoval(){
+  android.content.SharedPreferences options=getSharedPreferences("options",0);String requestId=options.getString("removal_id","");
+  if(reviewingRemoval||requestId.isEmpty())return;
+  if(System.currentTimeMillis()-options.getLong("removal_time",0)>120000){options.edit().remove("removal_id").apply();return;}
+  reviewingRemoval=true;
+  new AlertDialog.Builder(this).setTitle("Uninstall ZDesk?").setMessage("Your paired dashboard requested removal. Android will ask you to confirm uninstalling ZDesk. This ends sharing and removes saved pairing and files in this app's Inbox. Save received files before proceeding.").setCancelable(false)
+   .setNegativeButton("Keep ZDesk",(d,w)->{options.edit().remove("removal_id").apply();reviewingRemoval=false;reportRemoval(requestId,"cancelled");})
+   .setPositiveButton("Open uninstall",(d,w)->{
+    options.edit().remove("removal_id").putBoolean("control",false).apply();reviewingRemoval=false;ShareService.allowControl=false;
+    stopService(new Intent(this,ShareService.class));
+    // Disable our own accessibility service before opening the system confirmation.
+    if(ControlService.current!=null)ControlService.current.disableSelf();
+    reportRemoval(requestId,"removal_started");
+    try{startActivity(new Intent(Intent.ACTION_UNINSTALL_PACKAGE,Uri.parse("package:"+getPackageName())));}
+    catch(Exception e){reportRemoval(requestId,"failed");status.setText("Open Android Settings > Apps > ZDesk > Uninstall to remove it.");}
+   }).show();
+ }
+ void reportRemoval(String requestId,String state){new Thread(()->{try{String saved=Vault.load(this);if(saved==null)return;JSONObject enrollment=new JSONObject(saved);new Api(enrollment.getString("url"),enrollment.getString("token")).json("/api/devices/"+enrollment.getString("id")+"/removal","POST",new JSONObject().put("id",requestId).put("state",state));}catch(Exception ignored){}},"ZDesk removal status").start();}
  void begin(){if(ShareService.active){status.setText("Already sharing. Stop the current session before starting another.");return;}if(control.isChecked()&&ControlService.current==null){status.setText("Enable ZDesk accessibility control first, or uncheck control for view-only sharing.");return;}try{new Api(server.getText().toString().trim(),null);}catch(Exception e){status.setText(e.getMessage());return;}if(!screen.isChecked()&&!mic.isChecked()&&!files.isChecked()){status.setText("Choose at least one sharing option.");return;}if(mic.isChecked()&&checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO},20);return;}if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS},21);return;}approveScreen();}
  public void onRequestPermissionsResult(int request,String[] permissions,int[] results){super.onRequestPermissionsResult(request,permissions,results);if(request==20&&(results.length==0||results[0]!=PackageManager.PERMISSION_GRANTED)){status.setText("Microphone permission was not granted. Uncheck Microphone to continue without it.");return;}if(request==20){begin();return;}approveScreen();}
  void approveScreen(){if(screen.isChecked()){MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);Intent capture=Build.VERSION.SDK_INT>=34?m.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay()):m.createScreenCaptureIntent();startActivityForResult(capture,10);}else launch(0,null);}

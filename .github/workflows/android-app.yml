@@ -46,7 +46,7 @@ jobs:
           python - <<'PY'
           import hashlib,json,pathlib,subprocess
           apk=pathlib.Path('downloads/ZDesk-Android.apk')
-          pathlib.Path('downloads/android-build.json').write_text(json.dumps({'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'package':'com.zdesk.companion','version':'1.0','development_build':True}))
+          pathlib.Path('downloads/android-build.json').write_text(json.dumps({'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'package':'com.zdesk.companion','version':'1.1','development_build':True}))
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'

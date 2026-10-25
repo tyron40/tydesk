@@ -135,7 +135,9 @@ def enroll():
 def listing():
     with lock:
         return jsonify([dict(id=k, name=d['name'], online=time.time()-d['seen'] < 8,
-            control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol']) for k,d in devices.items()])
+            control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol'],
+            platform=d.get('platform','unknown'), removal_supported=d.get('removal_supported',False),
+            removal_state=('expired' if d.get('removal',{}).get('state') in ('pending','confirmation_required') and time.time()>d['removal']['expires']+(120 if d['removal']['state']=='confirmation_required' else 0) else d.get('removal',{}).get('state'))) for k,d in devices.items()])
 
 @app.post('/api/devices/<identity>/frame')
 def frame_upload(identity):
@@ -149,6 +151,9 @@ def frame_upload(identity):
         d['protocol']=2 if request.headers.get('X-TyDesk-Protocol')=='2' else 1
         cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
+        platform=request.headers.get('X-Companion-Platform','unknown')
+        d['platform']=platform if platform in ('windows','android') else 'unknown'
+        d['removal_supported']=d['platform']!='unknown' and request.headers.get('X-Companion-Removal')=='1'
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'
         d['files'] = request.headers.get('X-Allow-Files') == 'yes'
         if not d['audio']: d['audio_chunks'].clear()
@@ -204,6 +209,8 @@ def revoke(identity):
 
 from extensions import install
 purge_transfers = install(app, admin, device, devices, lock, DATA, audit)
+from companion_removal import install as install_removal
+install_removal(app, admin, device, devices, lock, audit)
 
 @app.get('/api/registry-status')
 @admin
