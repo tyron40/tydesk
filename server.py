@@ -1,5 +1,6 @@
 """TyDesk v2: persistent single-owner remote desktop broker."""
 import os, secrets, time, threading, math, sqlite3, hashlib
+import device_registry
 from pathlib import Path
 from collections import deque
 from functools import wraps
@@ -22,6 +23,11 @@ def audit(identity, event):
 def fresh(token, name):
     return dict(token=token, name=name, seen=0, frame=b'', commands=deque(maxlen=50), control=False,
         audio=False, files=False, audio_chunks=deque(maxlen=8), audio_seq=0, share=[])
+if device_registry.ENABLED:
+    # Durable registry is authoritative. Never resurrect locally cached revocations.
+    rows=device_registry.list_devices()
+    db.execute('DELETE FROM devices')
+    db.executemany('INSERT INTO devices VALUES (?,?,?)',[(d['id'],d['token'],d['name']) for d in rows]);db.commit()
 devices = {identity: fresh(token,name) for identity,token,name in db.execute('SELECT * FROM devices')}
 
 pairings = {}
@@ -58,7 +64,7 @@ def headers(response):
     return response
 
 @app.get('/')
-def index(): return render_template('index.html')
+def index(): return render_template('index.html',durable_devices=device_registry.ENABLED)
 
 from browser_routes import install as install_browser
 install_browser(app)
@@ -84,8 +90,10 @@ def enroll():
         expires = pairings.pop(str(data.get('code', '')), 0)
         if expires < time.time(): abort(403)
         identity, token = secrets.token_hex(12), secrets.token_urlsafe(32)
-        name = str(data.get('name', 'Windows PC'))[:80]
+        name = str(data.get('name', 'Windows PC'))[:80] or 'Computer'
         digest = hashlib.sha256(token.encode()).hexdigest()
+        try:device_registry.register(identity,digest,name)
+        except Exception:abort(503,description='Saved-device registry is temporarily unavailable. Try pairing again shortly.')
         devices[identity] = fresh(digest, name)
         db.execute('INSERT INTO devices VALUES (?,?,?)', (identity,digest,name)); db.commit()
         audit(identity, 'enrolled')
@@ -164,6 +172,8 @@ def command(identity):
 @admin
 def revoke(identity):
     with lock:
+        try:device_registry.revoke(identity)
+        except Exception:abort(503,description='Cannot persist revocation while the registry is unavailable. Retry shortly.')
         devices.pop(identity,None)
         db.execute('DELETE FROM devices WHERE id=?',(identity,)); db.commit()
         audit(identity, 'revoked')
@@ -172,6 +182,10 @@ def revoke(identity):
 
 from extensions import install
 purge_transfers = install(app, admin, device, devices, lock, DATA, audit)
+
+@app.get('/api/registry-status')
+@admin
+def registry_status():return jsonify(durable_devices=device_registry.ENABLED)
 
 @app.get('/api/audit')
 @admin
