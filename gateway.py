@@ -24,7 +24,7 @@ def forward(path):
         local.session = requests.Session()
         local.session.trust_env = False
     headers = {k: v for k, v in request.headers if k.lower() in (
-        'authorization', 'content-type', 'accept', 'range', 'if-range', 'if-none-match')
+        'authorization', 'content-type', 'accept', 'range', 'if-range', 'if-none-match', 'x-filename')
         or k.lower().startswith(('x-allow-', 'x-audio-', 'x-companion-', 'x-tydesk-', 'x-remote-'))}
     headers['Accept-Encoding'] = 'identity'
     url = UPSTREAM + '/' + quote(path, safe='/')
