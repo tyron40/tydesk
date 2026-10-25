@@ -27,13 +27,13 @@ class Companion:
         except Exception as e:self.status.set('Could not load enrollment: '+str(e))
     def build_ui(self,root):
         bg='#0c1422';panel='#152237';ink='#eef5ff';muted='#9fb2cb';mint='#51e2c0'
-        root.title('TyDesk — Companion');root.geometry('740x840');root.minsize(640,640);root.configure(bg=bg)
+        root.title('ZDesk — Companion');root.geometry('740x840');root.minsize(640,640);root.configure(bg=bg)
         root.option_add('*Font',('Segoe UI',10))
         style=ttk.Style(root);style.theme_use('clam')
         style.configure('TCheckbutton',background=panel,foreground=ink,padding=7,indicatorbackground='#273a53',indicatorforeground=mint)
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
-        tk.Label(header,text='TyDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
+        tk.Label(header,text='ZDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
         tk.Label(header,text='WINDOWS COMPANION  /  3.2',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
@@ -60,17 +60,17 @@ class Companion:
             tk.Entry(f,textvariable=var,show='•' if secret else '',bg='#0d1829',fg=ink,insertbackground=mint,relief='flat',highlightthickness=1,highlightbackground='#344964',highlightcolor=mint,font=('Segoe UI',11)).pack(fill='x',ipady=8,pady=(0,5))
         self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.microphone=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar();self.background=tk.BooleanVar()
         f=card('02  Choose what to share','Permissions apply only to this computer. You can disconnect at any time.')
-        for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · PC sounds',self.system_audio,self.audio),('Microphone · surrounding sound',self.microphone,self.mic),('Files in TyDesk Shared and Inbox folders',self.file_permission,self.files)]:
+        for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · PC sounds',self.system_audio,self.audio),('Microphone · surrounding sound',self.microphone,self.mic),('Files in ZDesk Shared and Inbox folders',self.file_permission,self.files)]:
             ttk.Checkbutton(f,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e)).pack(anchor='w')
         ttk.Checkbutton(f,text='Remember this computer and reconnect automatically',variable=self.unattended,command=self.remember_changed).pack(anchor='w')
         ttk.Checkbutton(f,text='Keep available in the tray when I close this window',variable=self.background,command=self.background_changed).pack(anchor='w')
-        f=card('03  Make it easy to return','Tray menu: Open TyDesk, Connect, Disconnect, or Quit TyDesk.')
+        f=card('03  Make it easy to return','Tray menu: Open ZDesk, Connect, Disconnect, or Quit ZDesk.')
         row=tk.Frame(f,bg=panel);row.pack(fill='x')
         button(row,'Desktop shortcut',self.shortcut).pack(side='left',padx=(0,8))
         button(row,'Enable sign-in start',self.enable_startup).pack(side='left',padx=(0,8))
         button(row,'Disable',self.disable_startup).pack(side='left')
         button(f,'Forget this computer',self.forget).pack(anchor='w',pady=(12,0))
-        self.home=Path.home()/'TyDesk';self.home.mkdir(exist_ok=True)
+        self.home=(Path.home()/'TyDesk') if (Path.home()/'TyDesk').exists() else Path.home()/'ZDesk';self.home.mkdir(exist_ok=True)
         tk.Label(f,text='Received files: '+str(self.home/'Inbox')+'\nShared files: '+str(self.home/'Shared'),bg=panel,fg=muted,justify='left',wraplength=570,font=('Segoe UI',9)).pack(anchor='w',pady=(12,0))
         footer=tk.Frame(root,bg=panel,padx=24,pady=15);footer.pack(fill='x',pady=(12,0))
         self.status=tk.StringVar(value='Ready to connect · your screen is not being shared')
@@ -78,11 +78,11 @@ class Companion:
         row=tk.Frame(footer,bg=panel);row.pack(fill='x')
         self.start=button(row,'Connect computer',self.connect,True);self.start.pack(side='left',padx=(0,10))
         button(row,'Disconnect',self.disconnect).pack(side='left')
-        button(row,'Quit TyDesk',self.quit).pack(side='right')
+        button(row,'Quit ZDesk',self.quit).pack(side='right')
         tk.Label(footer,text='Available after Windows sign-in while the PC is awake. Lock screen and UAC are not supported.',bg=panel,fg=muted,wraplength=650,font=('Segoe UI',8)).pack(anchor='w',pady=(10,0))
     def background_changed(self):
         if self.background.get():
-            if not messagebox.askokcancel('Keep remote access available?', 'Closing the window will leave TyDesk running with a visible tray icon and your selected sharing permissions. Use Disconnect or Quit TyDesk from the tray to stop access.'):
+            if not messagebox.askokcancel('Keep remote access available?', 'Closing the window will leave ZDesk running with a visible tray icon and your selected sharing permissions. Use Disconnect or Quit ZDesk from the tray to stop access.'):
                 self.background.set(False);return
             self.ensure_tray()
         self.save()
@@ -94,9 +94,9 @@ class Companion:
             image=Image.new('RGB',(64,64),'#152237');draw=ImageDraw.Draw(image)
             draw.rounded_rectangle((8,10,56,45),radius=7,outline='#51e2c0',width=5);draw.line((32,45,32,54),fill='#51e2c0',width=4);draw.line((22,54,42,54),fill='#51e2c0',width=4)
             def action(kind):return lambda icon,item:self.events.put(('action',kind))
-            self.tray=pystray.Icon('TyDesk',image,'TyDesk — remote access companion',pystray.Menu(
-                pystray.MenuItem('Open TyDesk',action('show'),default=True),pystray.MenuItem('Connect',action('connect')),
-                pystray.MenuItem('Disconnect',action('disconnect')),pystray.MenuItem('Quit TyDesk',action('quit'))))
+            self.tray=pystray.Icon('ZDesk',image,'ZDesk — remote access companion',pystray.Menu(
+                pystray.MenuItem('Open ZDesk',action('show'),default=True),pystray.MenuItem('Connect',action('connect')),
+                pystray.MenuItem('Disconnect',action('disconnect')),pystray.MenuItem('Quit ZDesk',action('quit'))))
             def setup(icon):icon.visible=True;self.tray_ready.set()
             def run():
                 try:self.tray.run(setup)
@@ -113,13 +113,13 @@ class Companion:
             except Exception as e:self.status.set('Could not save: '+str(e))
     def permission(self,var,event,persist=True):
         if persist and var is self.microphone and var.get():
-            if not messagebox.askokcancel('Share microphone and surrounding sound?', 'The dashboard owner will be able to hear this computer’s microphone, including surrounding conversations. Sharing continues in tray mode if enabled. Uncheck Microphone, Disconnect, or Quit TyDesk to stop it. Remembered permissions can reconnect after sign-in.'):
+            if not messagebox.askokcancel('Share microphone and surrounding sound?', 'The dashboard owner will be able to hear this computer’s microphone, including surrounding conversations. Sharing continues in tray mode if enabled. Uncheck Microphone, Disconnect, or Quit ZDesk to stop it. Remembered permissions can reconnect after sign-in.'):
                 var.set(False);return
         event.set() if var.get() else event.clear()
         if persist:self.save()
     def remember_changed(self):
         if self.unattended.get():
-            if not messagebox.askokcancel('Enable unattended reconnect?', 'This Windows user will reconnect and share the screen automatically when TyDesk starts. Enabled control, audio and file permissions will also be remembered. TyDesk remains visible as a window or tray icon; Disconnect stops this session.'):self.unattended.set(False);return
+            if not messagebox.askokcancel('Enable unattended reconnect?', 'This Windows user will reconnect and share the screen automatically when ZDesk starts. Enabled control, audio and file permissions will also be remembered. ZDesk remains visible as a window or tray icon; Disconnect stops this session.'):self.unattended.set(False);return
             self.save()
         else:local_settings.forget()
     def poll(self):
@@ -228,12 +228,12 @@ class Companion:
     def shortcut(self):
         try:
             import native_shell
-            native_shell.desktop_shortcut();self.status.set('TyDesk shortcut added to your desktop.')
+            native_shell.desktop_shortcut();self.status.set('ZDesk shortcut added to your desktop.')
         except Exception as e:messagebox.showerror('Shortcut',str(e))
     def enable_startup(self):
         if not self.credentials or not self.unattended.get():
             messagebox.showerror('Pair first','Pair once and enable Remember this computer first.');return
-        if not messagebox.askokcancel('Start at Windows sign-in?', 'TyDesk will open and reconnect using your remembered screen/control/audio/file permissions whenever this Windows user signs in.'):return
+        if not messagebox.askokcancel('Start at Windows sign-in?', 'ZDesk will open and reconnect using your remembered screen/control/audio/file permissions whenever this Windows user signs in.'):return
         try:
             import native_shell
             native_shell.startup(True);self.status.set('Windows sign-in startup enabled. The app remains visible.')
@@ -253,7 +253,7 @@ class Companion:
             if not self.tray_ready.is_set():
                 self.status.set('Starting the tray icon. Please close the window again in a moment.');return
             self.save();self.root.withdraw()
-            try:self.tray.notify('TyDesk is still available. Use the tray menu to open, disconnect, or quit.','TyDesk')
+            try:self.tray.notify('ZDesk is still available. Use the tray menu to open, disconnect, or quit.','ZDesk')
             except Exception:pass
         else:self.quit()
     def quit(self):
@@ -266,7 +266,7 @@ if __name__=='__main__':
         output=Path(sys.argv[sys.argv.index('--self-test')+1])
         try:
             with tempfile.TemporaryDirectory() as temp:
-                local_settings.ROOT=Path(temp)
+                local_settings.ROOT=Path(temp)/'ZDesk';local_settings.LEGACY_ROOT=Path(temp)/'TyDesk'
                 sample={'id':'build-smoke-test','token':'not-a-real-credential','url':'https://example.test'}
                 local_settings.save(sample);assert local_settings.load()==sample;local_settings.forget()
             root=tk.Tk();root.withdraw();root.update();root.destroy()
@@ -305,7 +305,7 @@ if __name__=='__main__':
         kernel.CreateMutexW.argtypes=[ctypes.c_void_p,wintypes.BOOL,wintypes.LPCWSTR];kernel.CreateMutexW.restype=wintypes.HANDLE
         kernel.CreateEventW.argtypes=[ctypes.c_void_p,wintypes.BOOL,wintypes.BOOL,wintypes.LPCWSTR];kernel.CreateEventW.restype=wintypes.HANDLE
         kernel.SetEvent.argtypes=[wintypes.HANDLE];kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
-        mutex=kernel.CreateMutexW(None,False,'Local\\TyDeskCompanion');already=kernel.GetLastError()==183
-        show_event=kernel.CreateEventW(None,False,False,'Local\\TyDeskShowCompanion')
+        mutex=kernel.CreateMutexW(None,False,'Local\\ZDeskCompanion');already=kernel.GetLastError()==183
+        show_event=kernel.CreateEventW(None,False,False,'Local\\ZDeskShowCompanion')
         if already:kernel.SetEvent(show_event);sys.exit(0)
     root=tk.Tk();companion=Companion(root);companion.show_event=show_event;root.mainloop()

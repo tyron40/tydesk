@@ -25,5 +25,5 @@ class Player{
  }
  stop(){this.generation++;for(const s of this.sources){try{s.stop();s.disconnect()}catch{}}this.sources.clear();if(this.context)this.context.close().catch(()=>{});this.context=null;this.next=0}
 }
-root.TyDeskAudio={Player,pcmWave};if(typeof module!=='undefined')module.exports=root.TyDeskAudio;
+root.ZDeskAudio={Player,pcmWave};if(typeof module!=='undefined')module.exports=root.ZDeskAudio;
 })(typeof window!=='undefined'?window:globalThis);

@@ -57,5 +57,5 @@ class Controls{
  release(){if(this.points.size||this.keys.size||this.drag)this.emit({type:'release'});this.points.clear();this.keys.clear();this.drag=false;this.multi=false}
  setMode(mode){this.release();this.mode=mode;this.el.style.touchAction=mode==='pan'?'auto':'none'}
 }
-root.TyDeskControls={Controls,point,keyName};if(typeof module!=='undefined')module.exports=root.TyDeskControls;
+root.ZDeskControls={Controls,point,keyName};if(typeof module!=='undefined')module.exports=root.ZDeskControls;
 })(typeof window!=='undefined'?window:globalThis);

@@ -1,4 +1,4 @@
-"""TyDesk v2: persistent single-owner remote desktop broker."""
+"""ZDesk v2: persistent single-owner remote desktop broker."""
 import os, secrets, time, threading, math, sqlite3, hashlib
 import device_registry
 import connection_access
@@ -146,7 +146,7 @@ def frame_upload(identity):
         if len(payload)>3*1024*1024: abort(413)
         d['frame'] = payload
         d['seen'] = time.time()
-        d['protocol']=2 if request.headers.get('X-TyDesk-Protocol')=='2' else 1
+        d['protocol']=2 if request.headers.get('X-ZDesk-Protocol')=='2' else 1
         cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'
@@ -219,5 +219,5 @@ def audit_log():
 if __name__ == '__main__':
     from waitress import serve
     host = os.environ.get('TYDESK_HOST','127.0.0.1')
-    print('TyDesk dashboard: http://' + host + ':8787')
+    print('ZDesk dashboard: http://' + host + ':8787')
     serve(app, host=host, port=int(os.environ.get('PORT', '8787')), threads=16)

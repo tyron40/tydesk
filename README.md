@@ -1,10 +1,10 @@
 ## Microphone sharing (3.2)
 
-The Windows companion has separate **System playback audio · PC sounds** and **Microphone · surrounding sound** checkboxes. Microphone access defaults off. Enabling it requires local confirmation; remembered microphone permission is stored only when Remember this computer is selected. The default Windows input device is used. Enable either source or both, then click **Listen to shared audio** in the dashboard. Windows desktop microphone permission and a working physical input device are required. Uncheck Microphone, Disconnect, or Quit TyDesk to stop microphone sharing. An in-flight audio upload cannot be recalled.
+The Windows companion has separate **System playback audio · PC sounds** and **Microphone · surrounding sound** checkboxes. Microphone access defaults off. Enabling it requires local confirmation; remembered microphone permission is stored only when Remember this computer is selected. The default Windows input device is used. Enable either source or both, then click **Listen to shared audio** in the dashboard. Windows desktop microphone permission and a working physical input device are required. Uncheck Microphone, Disconnect, or Quit ZDesk to stop microphone sharing. An in-flight audio upload cannot be recalled.
 
-# TyDesk v2 — Windows remote desktop development build
+# ZDesk v2 — Windows remote desktop development build
 
-Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first TyDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
+Original code with a browser controller, Windows companion, and self-hostable relay broker. This package expands the first ZDesk preview. It is NOT a tested, feature-complete replacement for RustDesk. Native Windows secure-desktop/pre-login support, video codecs/WebRTC, multi-monitor operation, installers/code signing, MFA and end-to-end encryption against the relay are not implemented.
 
 ## Dashboard 3.1: mouse, touch and system audio
 
@@ -28,11 +28,11 @@ Enable **Keep available in the tray when I close this window** for window-close 
 
 ## Standalone Windows application
 
-Download https://tydesk-broker.onrender.com/download/windows to get **TyDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add TyDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
+Download https://tydesk-broker.onrender.com/download/windows to get **ZDesk.exe** (Windows x64). No Python or VS Code is required. Save the EXE in a permanent folder and double-click it to open the companion connection page. It is unsigned. Use **Add ZDesk desktop shortcut** to create a desktop icon; keep the EXE in place afterward.
 
 Pair once using a dashboard code and select **Remember this computer and reconnect automatically**. The local enrollment is encrypted with Windows DPAPI. Future app launches reconnect with it without another pairing code. Enable sign-in startup for automatic launch when this Windows user signs in. The app stays available as a window or an opted-in tray icon, with Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
 
-**Permanent device storage is configured.** Render uses a protected Supabase registry in isolated TyDesk tables in the existing motivation project. Device identities and token hashes survive free-server filesystem resets; raw enrollment tokens stay on the Windows device. The unused extra database project was deleted. No additional database project or paid Render disk was added. Usage counts toward the existing account's allowances.
+**Permanent device storage is configured.** Render uses a protected Supabase registry in isolated ZDesk tables in the existing motivation project. Device identities and token hashes survive free-server filesystem resets; raw enrollment tokens stay on the Windows device. The unused extra database project was deleted. No additional database project or paid Render disk was added. Usage counts toward the existing account's allowances.
 
 The EXE was built on a Windows runner. The packaged app passed its Tk startup and DPAPI round-trip self-test. The live downloaded binary's SHA-256 was checked against downloads/windows-build.json. Physical Windows capture, audio hardware and sign-in startup still require testing on your PC.
 
@@ -45,7 +45,7 @@ Source download remains at https://tydesk-broker.onrender.com/download/windows-s
 - Opt-in saved enrollment protected by the current Windows user's DPAPI. After initial pairing, no new prompt is required when Remember this device is enabled.
 - Opt-in Task Scheduler startup at Windows sign-in, in the current user's interactive desktop, with a companion window or opted-in tray icon. Connection loss triggers retries when saved reconnect is enabled. Revoked credentials stop retries.
 - System playback audio capture using WASAPI loopback through SoundCard, with browser playback. Separate opt-in microphone capture is available in version 3.2. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
-- Bidirectional file transfer: browser uploads into `~/TyDesk/Inbox`; browser downloads only files the local user places in `~/TyDesk/Shared`. File transfers use a separate worker so they do not block screen uploads.
+- Bidirectional file transfer: browser uploads into `~/ZDesk/Inbox`; browser downloads only files the local user places in `~/ZDesk/Shared`. File transfers use a separate worker so they do not block screen uploads.
 - Persistent enrollment/revocation/file/disconnect event history, viewable in the dashboard.
 - Free-plan Render deployment configuration; Dockerfile and Docker Compose for self-hosting.
 
@@ -55,7 +55,7 @@ Open https://tydesk-broker.onrender.com/companion on the computer you want to sh
 
 Browser mode has no OS mouse/keyboard control, system audio, file exchange or unattended startup. Screen-capture support varies by browser; unsupported browsers show an explanation. Screen permission is requested each time and capture is not saved across reloads. Browser sharing needs an actual desktop-browser/device test; server route and download tests do not prove screen capture works on every platform.
 
-For native features, use Download TyDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
+For native features, use Download ZDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-ZDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-ZDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
@@ -89,7 +89,7 @@ The scripts' ExecutionPolicy Bypass applies only to that invocation. They do not
 powershell -ExecutionPolicy Bypass -File .\install-startup.ps1
 ```
 
-The current Windows user gets a named `TyDesk Remote Access Companion` scheduled task that starts the visible companion on sign-in. Keep the extracted project folder in place. Sign out and back in to test.
+The current Windows user gets a named `ZDesk Remote Access Companion` scheduled task that starts the visible companion on sign-in. Keep the extracted project folder in place. Sign out and back in to test.
 
 To remove automatic startup:
 
@@ -97,7 +97,7 @@ To remove automatic startup:
 powershell -ExecutionPolicy Bypass -File .\uninstall-startup.ps1
 ```
 
-Disconnect stops the current connection; it does not erase your saved enrollment. **Forget saved enrollment** erases the local credential. Also use dashboard **Revoke** to remove server authorization. Closing the window keeps it running only when tray mode is enabled. Quit TyDesk stops the application.
+Disconnect stops the current connection; it does not erase your saved enrollment. **Forget saved enrollment** erases the local credential. Also use dashboard **Revoke** to remove server authorization. Closing the window keeps it running only when tray mode is enabled. Quit ZDesk stops the application.
 
 **This is not a system service. It cannot control Windows before sign-in, the lock screen, or UAC's secure desktop.** A native service and desktop-session integration are required for those capabilities. No Windows password is stored and Windows sign-in is not bypassed.
 
@@ -107,13 +107,13 @@ Enable **Share system playback audio** locally. In the browser session, click **
 
 ## File exchange
 
-Enable the local file permission. The companion creates `TyDesk/Inbox` and `TyDesk/Shared` in the Windows user's home directory. Use the browser file picker and **Send file** for uploads. For downloads, place a file directly inside Shared, click **Refresh files**, request it, then refresh shortly afterward for the Download button.
+Enable the local file permission. The companion creates `ZDesk/Inbox` and `ZDesk/Shared` in the Windows user's home directory. Use the browser file picker and **Send file** for uploads. For downloads, place a file directly inside Shared, click **Refresh files**, request it, then refresh shortly afterward for the Download button.
 
 Limits: 20 MiB per file, 200 MiB aggregate broker storage, 100 outstanding transfer records, 200 published files per device, simple ASCII filenames. No arbitrary filesystem browsing, recursive directory download or automatic execution. Files are never intentionally overwritten; collisions use a transfer ID prefix. Transfers expire after an hour when the next file API operation runs, or are purged by revocation/disconnect. Restarting the broker clears temporary transfers; persistent device enrollment remains. Files are not malware-scanned. Permission changes stop new work; an HTTP upload already in flight may finish before disconnect completes. There is no resumed upload protocol.
 
 ## Internet hosting — Render
 
-TyDesk is deployed at **https://tydesk-broker.onrender.com/** on Render's **free** compute plan in My Workspace. Source: private repository https://github.com/tyron40/tydesk. No paid compute or persistent disk was provisioned.
+ZDesk is deployed at **https://tydesk-broker.onrender.com/** on Render's **free** compute plan in My Workspace. Source: private repository https://github.com/tyron40/tydesk. No paid compute or persistent disk was provisioned.
 
 ### Use the hosted server from Windows
 
@@ -153,7 +153,7 @@ Primary display only; no Ctrl+Alt+Delete, clipboard sync, Unicode typing or mobi
 
 ## License and references
 
-Original TyDesk source: MIT; dependencies have their own licenses. Not affiliated with RustDesk.
+Original ZDesk source: MIT; dependencies have their own licenses. Not affiliated with RustDesk.
 
 - https://render.com/docs/blueprint-spec
 - https://render.com/docs/disks

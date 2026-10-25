@@ -10,9 +10,9 @@ def desktop_shortcut():
     if os.name!='nt':raise RuntimeError('Windows only')
     import win32com.client
     shell=win32com.client.Dispatch('WScript.Shell')
-    shortcut=shell.CreateShortcut(str(Path(shell.SpecialFolders('Desktop'))/'TyDesk.lnk'))
+    shortcut=shell.CreateShortcut(str(Path(shell.SpecialFolders('Desktop'))/'ZDesk.lnk'))
     exe,args=target();shortcut.TargetPath=str(exe);shortcut.Arguments=args.replace(' --autostart','').replace('--autostart','')
-    shortcut.WorkingDirectory=str(exe.parent);shortcut.Description='TyDesk remote desktop companion'
+    shortcut.WorkingDirectory=str(exe.parent);shortcut.Description='ZDesk remote desktop companion'
     shortcut.IconLocation=str(exe)+',0';shortcut.Save()
 
 def startup(enabled):
@@ -25,8 +25,9 @@ $action=New-ScheduledTaskAction -Execute $env:TYDESK_APP_EXE -Argument $env:TYDE
 $trigger=New-ScheduledTaskTrigger -AtLogOn -User $user
 $principal=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
 $settings=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
-Register-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Description 'Visible TyDesk companion; enabled by the local user.' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+Unregister-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue
+Register-ScheduledTask -TaskName 'ZDesk Remote Access Companion' -Description 'Visible ZDesk companion; enabled by the local user.' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
 '''
-    else:script="Unregister-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue"
+    else:script="Unregister-ScheduledTask -TaskName 'TyDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue; Unregister-ScheduledTask -TaskName 'ZDesk Remote Access Companion' -Confirm:$false -ErrorAction SilentlyContinue"
     result=subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',script],env=env,capture_output=True,text=True,timeout=30,creationflags=subprocess.CREATE_NO_WINDOW)
     if result.returncode:raise RuntimeError(result.stderr.strip()[:300] or 'Windows startup setup failed')

@@ -15,13 +15,13 @@ class BrowserTests(unittest.TestCase):
   r=self.client.get('/download/windows-source');self.assertEqual(r.status_code,200)
   self.assertIn('attachment;',r.headers['Content-Disposition'])
   with zipfile.ZipFile(io.BytesIO(r.data)) as z:
-   names=z.namelist();self.assertIn('TyDesk-Companion/Start-TyDesk.cmd',names)
-   self.assertIn('TyDesk-Companion/agent.py',names)
+   names=z.namelist();self.assertIn('ZDesk-Companion/Start-ZDesk.cmd',names)
+   self.assertIn('ZDesk-Companion/agent.py',names)
    for name in ['audio_capture.py','file_exchange.py','extensions.py','local_settings.py','requirements.txt','start-agent.ps1']:
-    self.assertIn('TyDesk-Companion/'+name,names)
+    self.assertIn('ZDesk-Companion/'+name,names)
    self.assertTrue(all('data/' not in n and not n.endswith('.dat') for n in names))
    for n in names:self.assertNotIn(server.ADMIN.encode(),z.read(n))
-   agent=z.read('TyDesk-Companion/agent.py');self.assertIn(b'https://tydesk-broker.onrender.com',agent)
+   agent=z.read('ZDesk-Companion/agent.py');self.assertIn(b'https://tydesk-broker.onrender.com',agent)
    self.assertNotIn(b'http://127.0.0.1:8787',agent)
  def test_revoked_browser_pairing_cannot_upload(self):
   admin={'Authorization':'Bearer '+server.ADMIN}
