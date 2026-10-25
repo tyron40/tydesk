@@ -3,7 +3,7 @@ import os
 import threading
 from urllib.parse import quote
 import requests
-from flask import Flask, Response, request, stream_with_context
+from flask import Flask, Response, request, stream_with_context, render_template, jsonify
 
 # Fixed destination: clients can never select an arbitrary proxy target.
 UPSTREAM = 'https://tydesk-broker.onrender.com'
@@ -11,13 +11,38 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 21 * 1024 * 1024
 local = threading.local()
 
+# Public pages and downloads are local so a sleeping broker cannot replace the
+# dashboard with Render's 502 page. The existing broker has a durable registry.
+from browser_routes import install as install_browser
+install_browser(app, durable_devices=True)
+
+
+@app.get('/')
+def index():
+    return render_template('index.html', durable_devices=True)
+
+
+@app.after_request
+def headers(response):
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; media-src 'self' blob:; frame-ancestors 'none'"
+    return response
+
+
+def starting():
+    response = jsonify(error='backend_starting', message='ZDesk is starting. Please wait a moment.')
+    response.status_code = 503
+    response.headers['Retry-After'] = '3'
+    return response
+
 
 @app.get('/healthz')
 def health():
     return {'service': 'ZDesk gateway', 'ready': True}
 
 
-@app.route('/', defaults={'path': ''}, methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 @app.route('/<path:path>', methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def forward(path):
     if not hasattr(local, 'session'):
@@ -36,7 +61,10 @@ def forward(path):
         prepared = requests.Request(request.method, url, headers=headers, data=request.get_data()).prepare()
         remote = local.session.send(prepared, timeout=(10, 90), stream=True, allow_redirects=False)
     except requests.RequestException:
-        return Response('ZDesk is waking up or temporarily unavailable. Try again shortly.', status=503)
+        return starting()
+    if remote.status_code in (502, 503, 504):
+        remote.close()
+        return starting()
     excluded = {'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
         'te', 'trailer', 'transfer-encoding', 'upgrade', 'content-encoding', 'content-length', 'set-cookie'}
     connection_headers = {s.strip().lower() for s in remote.headers.get('Connection', '').split(',')}

@@ -12,9 +12,10 @@ def windows_exe():
     current=ROOT/'downloads'/'ZDesk.exe'
     return current if current.is_file() else ROOT/'downloads'/'TyDesk.exe'
 
-def install(app):
+def install(app, durable_devices=None):
+    durable=bool(os.environ.get('TYDESK_REGISTRY_URL')) if durable_devices is None else durable_devices
     @app.get('/companion')
-    def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),android_app_available=(ROOT/'downloads'/'ZDesk-Android.apk').is_file(),durable_devices=bool(os.environ.get('TYDESK_REGISTRY_URL')))
+    def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),android_app_available=(ROOT/'downloads'/'ZDesk-Android.apk').is_file(),durable_devices=durable)
     @app.get('/api/downloads')
     def download_info():
         exe=windows_exe()
