@@ -25,7 +25,7 @@ public class ShareService extends Service {
  MediaProjection projection;VirtualDisplay display;ImageReader reader;HandlerThread captureThread;Handler capture;final Handler main=new Handler(Looper.getMainLooper());
  final AtomicReference<byte[]> frame=new AtomicReference<>(),audio=new AtomicReference<>();
  final ExecutorService workers=Executors.newFixedThreadPool(4);
- int width,height,density;Map<String,Uri> shares=new HashMap<>();Set<String> finished=new HashSet<>();
+ long encodedAt=0;int width,height,density;Map<String,Uri> shares=new HashMap<>();Set<String> finished=new HashSet<>();
  final String channel="zdesk-sharing";
  public IBinder onBind(Intent intent){return null;}
  public int onStartCommand(Intent intent,int flags,int startId){
@@ -43,7 +43,7 @@ public class ShareService extends Service {
  void notice(String text){getSharedPreferences("options",0).edit().putString("status",text).apply();if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)return;if(running)((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).notify(42,notification(text));}
  void resize(int w,int h){if(!running||projection==null||w<=0||h<=0)return;deviceWidth=w;deviceHeight=h;float scale=Math.min(1,1200f/Math.max(w,h));int nw=Math.max(2,(int)(w*scale)),nh=Math.max(2,(int)(h*scale));if(reader!=null&&nw==width&&nh==height)return;width=nw;height=nh;
   ImageReader next=ImageReader.newInstance(width,height,PixelFormat.RGBA_8888,2);ImageReader old=reader;reader=next;
-  next.setOnImageAvailableListener(r->{try(Image image=r.acquireLatestImage()){if(image==null||!running)return;Image.Plane p=image.getPlanes()[0];int padded=image.getWidth()+(p.getRowStride()-p.getPixelStride()*image.getWidth())/p.getPixelStride();Bitmap full=Bitmap.createBitmap(padded,image.getHeight(),Bitmap.Config.ARGB_8888);full.copyPixelsFromBuffer(p.getBuffer());Bitmap cropped=Bitmap.createBitmap(full,0,0,image.getWidth(),image.getHeight());ByteArrayOutputStream out=new ByteArrayOutputStream();cropped.compress(Bitmap.CompressFormat.JPEG,55,out);frame.set(out.toByteArray());if(cropped!=full)cropped.recycle();full.recycle();}catch(Exception e){notice("Capture interrupted; stop and restart sharing if it persists.");}},capture);
+  next.setOnImageAvailableListener(r->{try(Image image=r.acquireLatestImage()){if(image==null||!running)return;if(android.os.SystemClock.elapsedRealtime()-encodedAt<300)return;encodedAt=android.os.SystemClock.elapsedRealtime();Image.Plane p=image.getPlanes()[0];int padded=image.getWidth()+(p.getRowStride()-p.getPixelStride()*image.getWidth())/p.getPixelStride();Bitmap full=Bitmap.createBitmap(padded,image.getHeight(),Bitmap.Config.ARGB_8888);full.copyPixelsFromBuffer(p.getBuffer());Bitmap cropped=Bitmap.createBitmap(full,0,0,image.getWidth(),image.getHeight());ByteArrayOutputStream out=new ByteArrayOutputStream();cropped.compress(Bitmap.CompressFormat.JPEG,55,out);frame.set(out.toByteArray());if(cropped!=full)cropped.recycle();full.recycle();}catch(Exception e){notice("Capture interrupted; stop and restart sharing if it persists.");}},capture);
   if(display==null)display=projection.createVirtualDisplay("ZDesk",width,height,density,DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,next.getSurface(),null,capture);else{display.resize(width,height,density);display.setSurface(next.getSurface());}if(old!=null)old.close();
  }
  void connect(String code){try{
