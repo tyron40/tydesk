@@ -1,0 +1,62 @@
+name: Build Windows companion
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - agent.py
+      - native_shell.py
+      - local_settings.py
+      - audio_capture.py
+      - file_exchange.py
+      - extensions.py
+      - requirements.txt
+      - tools/make_windows_icon.py
+      - .github/workflows/windows-app.yml
+permissions:
+  contents: write
+concurrency:
+  group: windows-companion
+  cancel-in-progress: false
+jobs:
+  windows-app:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller==6.22.3
+      - name: Build Windows application
+        run: |
+          python tools/make_windows_icon.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --name TyDesk --icon build/tydesk.ico --hidden-import win32timezone --collect-all soundcard agent.py
+      - name: Check packaged application
+        shell: pwsh
+        run: |
+          $proc = Start-Process -FilePath .\dist\TyDesk.exe -ArgumentList '--self-test', 'windows-smoke.json' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "Packaged application self-test failed" }
+          $report = Get-Content windows-smoke.json -Raw | ConvertFrom-Json
+          if (-not $report.ok) { throw 'Packaged application self-test did not pass' }
+          if ((Get-Item dist/TyDesk.exe).Length -gt 95MB) { throw 'Application is too large for repository distribution' }
+      - name: Publish executable to app download directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force downloads | Out-Null
+          Copy-Item dist/TyDesk.exe downloads/TyDesk.exe -Force
+          $hash = (Get-FileHash downloads/TyDesk.exe -Algorithm SHA256).Hash.ToLower()
+          @{ sha256 = $hash; source_commit = '${{ github.sha }}'; architecture = 'windows-x64'; unsigned = $true } | ConvertTo-Json | Set-Content downloads/windows-build.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add downloads/TyDesk.exe downloads/windows-build.json
+          git commit -m 'Publish standalone Windows companion app'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not commit executable' }
+          git pull --rebase origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not synchronize executable commit' }
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish executable' }
