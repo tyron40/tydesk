@@ -33,6 +33,12 @@ def initialize_audio_thread():
     if result==-2147417850:return lambda:None # Existing COM apartment remains usable.
     raise RuntimeError('Could not initialize Windows playback capture ('+str(result)+')')
 
+def load_audio_backend():
+    # SoundCard initializes COM during its first import and rejects S_FALSE.
+    # Import on the fresh capture thread before adding our balanced COM reference.
+    import soundcard as sc
+    return sc,initialize_audio_thread()
+
 def run(url,identity,token,stop,permission,report):
     import requests
     chunks=queue.Queue(maxsize=3);done=threading.Event();state={'state':'waiting','message':'Starting system playback capture','level':0};state_lock=threading.Lock()
@@ -61,8 +67,7 @@ def run(url,identity,token,stop,permission,report):
     sender=threading.Thread(target=upload,daemon=True);sender.start()
     cleanup_com=lambda:None
     try:
-        cleanup_com=initialize_audio_thread()
-        import soundcard as sc
+        sc,cleanup_com=load_audio_backend()
         while not stop.is_set() and permission.is_set():
             try:
                 speaker=sc.default_speaker()

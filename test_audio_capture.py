@@ -29,4 +29,16 @@ class WindowsAudioThreadTests(unittest.TestCase):
   for _ in range(2):
    thread=threading.Thread(target=worker);thread.start();thread.join(10);self.assertFalse(thread.is_alive())
   self.assertEqual(errors,[])
+class BackendOrderTests(unittest.TestCase):
+ def test_library_import_precedes_explicit_thread_initialization(self):
+  import builtins,sys
+  from unittest.mock import patch,Mock
+  import audio_capture
+  order=[];original=builtins.__import__;fake=Mock()
+  def imported(name,*args,**kwargs):
+   if name=='soundcard':order.append('import');return fake
+   return original(name,*args,**kwargs)
+  with patch('builtins.__import__',side_effect=imported),patch.object(audio_capture,'initialize_audio_thread',side_effect=lambda:order.append('initialize') or (lambda:None)):
+   backend,cleanup=audio_capture.load_audio_backend()
+  self.assertEqual(order,['import','initialize']);self.assertIs(backend,fake)
 if __name__=='__main__':unittest.main()

@@ -34,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='TyDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.1',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.1.1',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -268,6 +268,18 @@ if __name__=='__main__':
                 local_settings.save(sample);assert local_settings.load()==sample;local_settings.forget()
             root=tk.Tk();root.withdraw();root.update();root.destroy()
             import native_shell
+            # Exercise a cold SoundCard import on a fresh thread, as real audio does.
+            from audio_capture import load_audio_backend
+            audio_errors=[]
+            def cold_audio():
+                cleanup=lambda:None
+                try:backend,cleanup=load_audio_backend()
+                except Exception as exc:audio_errors.append(str(exc))
+                finally:cleanup()
+            for _ in range(2):
+                audio_check=threading.Thread(target=cold_audio);audio_check.start();audio_check.join(10)
+                assert not audio_check.is_alive(),'Audio initialization timed out'
+            assert not audio_errors,str(audio_errors)
             import soundcard
             import numpy as np
             assert len(np.fromstring(b'\x00'*8,dtype=np.float32))==2,'WASAPI NumPy compatibility check failed'
