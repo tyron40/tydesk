@@ -8,7 +8,7 @@ Download https://tydesk-broker.onrender.com/download/windows to get **TyDesk.exe
 
 Pair once using a dashboard code and select **Pair once and remember this computer**. The local enrollment is encrypted with Windows DPAPI. Future app launches load it without another pairing code; click Start / reconnect, or explicitly enable **Start at Windows sign-in** for automatic reconnection. The app stays visible and retains Disconnect and Forget controls. Offline devices stay in the dashboard as long as the device registry is retained.
 
-**Permanent storage setup is pending.** The optional device_registry.py backend is implemented and tested, but is not configured on Render. A newly created database project unexpectedly quoted a paid fee and must be removed rather than used. Do not assume the free Render filesystem will retain the device list through resets until a no-new-project-cost registry is configured. No new registry secrets are in source or in the app download.
+**Permanent device storage is configured.** Render uses a protected Supabase registry in isolated TyDesk tables in the existing motivation project. Device identities and token hashes survive free-server filesystem resets; raw enrollment tokens stay on the Windows device. The unused extra database project was deleted. No additional database project or paid Render disk was added. Usage counts toward the existing account's allowances.
 
 The EXE was built on a Windows runner. The packaged app passed its Tk startup and DPAPI round-trip self-test. The live downloaded binary's SHA-256 was checked against downloads/windows-build.json. Physical Windows capture, audio hardware and sign-in startup still require testing on your PC.
 
@@ -17,7 +17,7 @@ Source download remains at https://tydesk-broker.onrender.com/download/windows-s
 ## Implemented
 
 - Browser device dashboard, screen viewing, mouse clicks, basic keys, ASCII text, scrolling and revocation.
-- Persistent broker device registry in SQLite. The server stores a SHA-256 digest of each random device token, not the usable token.
+- Persistent broker device registry backed by Supabase on the hosted service, with SQLite as the local cache. The server stores a SHA-256 digest of each random device token, not the usable token.
 - Opt-in saved enrollment protected by the current Windows user's DPAPI. After initial pairing, no new prompt is required when Remember this device is enabled.
 - Opt-in Task Scheduler startup at Windows sign-in, in the current user's interactive desktop, with a visible companion window. Connection loss triggers retries when saved reconnect is enabled. Revoked credentials stop retries.
 - System playback audio capture using WASAPI loopback through SoundCard, with browser playback. No microphone capture. Audio is sent as short stereo WAV chunks, with bounded latency/buffering.
@@ -31,7 +31,7 @@ Open https://tydesk-broker.onrender.com/companion on the computer you want to sh
 
 Browser mode has no OS mouse/keyboard control, system audio, file exchange or unattended startup. Screen-capture support varies by browser; unsupported browsers show an explanation. Screen permission is requested each time and capture is not saved across reloads. Browser sharing needs an actual desktop-browser/device test; server route and download tests do not prove screen capture works on every platform.
 
-For native features, use Download TyDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. This direct download contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. Extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The bundled companion defaults to the hosted server. It is not a standalone EXE or a signed installer. The download contains no passwords, enrollment credentials, or server data.
+For native features, use Download TyDesk for Windows on that page or https://tydesk-broker.onrender.com/download/windows. The source alternative is https://tydesk-broker.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-TyDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-TyDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
@@ -105,7 +105,7 @@ The live HTTPS deployment was checked for authentication rejection, authenticate
 
 ### Free-tier constraints
 
-The server uses an ephemeral filesystem with no disk. Saved device enrollment and temporary files are lost when Render resets that filesystem, including spin-downs, restarts and redeploys. Free services spin down after inactivity and take time to wake; usage limits are shared with the workspace's other free services. Bandwidth and build usage are metered at workspace level; exceeding included allowances can cause suspension or supplementary charges depending on account billing settings. This is a free-plan test deployment, not guaranteed zero-cost unlimited hosting or reliable always-on unattended access.
+The server uses an ephemeral filesystem with no disk. Temporary files and active sessions are lost when Render resets that filesystem. Saved device identities and authorization hashes are restored from the separate durable registry; remembered native companions can reconnect using their existing credentials. Free services spin down after inactivity and take time to wake; usage limits are shared with the workspace's other free services. Bandwidth and build usage are metered at workspace level; exceeding included allowances can cause suspension or supplementary charges depending on account billing settings. This is a free-plan test deployment, not guaranteed zero-cost unlimited hosting or reliable always-on unattended access.
 
 The included render.yaml now matches free hosting, with no persistent disk. It declares the password as a secret placeholder and never embeds its value. The created service is managed directly in Render; do not apply a separate Blueprint to the same service without reviewing its settings.
 
@@ -121,7 +121,7 @@ An internet deployment uses outbound HTTPS from the companion. No inbound router
 .\.venv\Scripts\python.exe -m unittest -v test_server.py test_exchange.py test_browser.py
 ```
 
-Twelve tests cover auth, pairing, command validation, device token isolation, audio chunk transport/permission, SQLite token storage, disconnect/revocation, path traversal rejection, and bidirectional file delivery over real HTTP with temporary files, browser-page availability, credential-free download contents, and revoked browser pairing behavior. Python compilation and dashboard JavaScript syntax were checked.
+Twelve tests cover auth, pairing, command validation, device token isolation, audio chunk transport/permission, SQLite token storage, disconnect/revocation, path traversal rejection, and bidirectional file delivery over real HTTP with temporary files, browser-page availability, credential-free download contents, and revoked browser pairing behavior. Python compilation and dashboard JavaScript syntax were checked. Live registry write/read, wrong-key rejection and deletion passed. A separate integration check restarted the broker against two fresh filesystems and verified saved-device recovery, authentication with the existing token, and revocation surviving another restart.
 
 These tests do not verify actual Windows capture/control, DPAPI, Task Scheduler startup, WASAPI audio drivers, browser audio playback, or a real Windows-to-browser internet session. Those need your Windows machine and the hosted service. A full RustDesk replacement additionally needs native secure-desktop support, reliable encoding/streaming, keyboard layout handling, multi-monitor support, stronger authentication, E2EE, installation/signing, load/concurrency testing and an independent security review. Do not treat this development build as that finished product.
 
