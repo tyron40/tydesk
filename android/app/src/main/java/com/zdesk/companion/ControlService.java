@@ -6,7 +6,7 @@ import android.os.Bundle;
 import org.json.*;
 public class ControlService extends AccessibilityService {
  static volatile ControlService current;
- Path drag;float x=.5f,y=.5f;boolean ctrl=false;
+ long lastInput=0;Path drag;float x=.5f,y=.5f;boolean ctrl=false;
  protected void onServiceConnected(){current=this;}
  public void onAccessibilityEvent(AccessibilityEvent e){}
  public void onInterrupt(){drag=null;ctrl=false;}
@@ -15,6 +15,7 @@ public class ControlService extends AccessibilityService {
  float px(float x){return x*Math.max(1,ShareService.deviceWidth-1);}float py(float y){return y*Math.max(1,ShareService.deviceHeight-1);}
  void execute(JSONObject c){
   if(!ShareService.active||!ShareService.projectionActive||!ShareService.allowControl)return;
+  long now=android.os.SystemClock.elapsedRealtime();if(now-lastInput>1500){drag=null;ctrl=false;}lastInput=now;
   String type=c.optString("type"),key=c.optString("key");
   if(type.equals("release")){drag=null;ctrl=false;return;}
   if(type.equals("hold"))return;
