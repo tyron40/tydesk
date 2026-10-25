@@ -1,8 +1,9 @@
-"""Continuous system playback capture; bounded upload queue, no physical microphone."""
+"""Continuous system playback capture; bounded upload queue, explicit local permission for each source."""
 import io,threading,wave,queue,time,sys
+from contextlib import ExitStack
 
-def start(url,identity,token,stop,permission,report):
-    thread=threading.Thread(target=run,args=(url,identity,token,stop,permission,report),daemon=True)
+def start(url,identity,token,stop,permission,report,microphone=None):
+    thread=threading.Thread(target=run,args=(url,identity,token,stop,permission,report,microphone),daemon=True)
     thread.start();return thread
 
 def pcm_wav(samples):
@@ -39,8 +40,25 @@ def load_audio_backend():
     import soundcard as sc
     return sc,initialize_audio_thread()
 
-def run(url,identity,token,stop,permission,report):
+def sources(sc,system,microphone):
+    result=[]
+    if system:
+        speaker=sc.default_speaker()
+        if speaker is None:raise RuntimeError('No Windows playback device is enabled.')
+        loopback=sc.get_microphone(id=str(speaker.id),include_loopback=True)
+        if not loopback.isloopback:raise RuntimeError('Playback loopback is unavailable.')
+        result.append(loopback)
+    if microphone:
+        mic=sc.default_microphone()
+        if mic is None or mic.isloopback:raise RuntimeError('No physical microphone is available. Select an input in Windows Sound settings and allow desktop microphone access.')
+        result.append(mic)
+    return result
+
+def run(url,identity,token,stop,permission,report,microphone=None):
     import requests
+    microphone=microphone or threading.Event()
+    signature=lambda:(permission.is_set(),microphone.is_set())
+    active=lambda:any(signature())
     chunks=queue.Queue(maxsize=3);done=threading.Event();state={'state':'waiting','message':'Starting system playback capture','level':0};state_lock=threading.Lock()
     def status(kind,message,level=0):
         with state_lock:state.update(state=kind,message=message[:160],level=level)
@@ -48,20 +66,20 @@ def run(url,identity,token,stop,permission,report):
         last_status=0;last_error=0;interrupted=False;backoff=.3
         with requests.Session() as session:
             session.headers['Authorization']='Bearer '+token
-            while not stop.is_set() and not done.is_set() and permission.is_set():
+            while not stop.is_set() and not done.is_set() and active():
                 try:
-                    try:stamp,payload=chunks.get(timeout=.2)
+                    try:stamp,payload,mode=chunks.get(timeout=.2)
                     except queue.Empty:payload=None
-                    if stop.is_set() or done.is_set() or not permission.is_set():return
+                    if stop.is_set() or done.is_set() or not active():return
                     if payload is not None:
-                        if time.monotonic()-stamp>.8:continue
+                        if time.monotonic()-stamp>.8 or mode!=signature():continue
                         with state_lock:level=state['level']
                         r=session.post(f'{url}/api/devices/{identity}/audio',data=payload,
-                            headers={'Content-Type':'audio/wav','X-Audio-Level':str(level)},timeout=(5,15))
+                            headers={'Content-Type':'audio/wav','X-Audio-Level':str(level),'X-Audio-Source':'both' if all(mode) else 'microphone' if mode[1] else 'system'},timeout=(5,15))
                         if r.status_code==401:stop.set();return
                         if r.status_code==409:stop.wait(.3);continue
                         r.raise_for_status()
-                        if interrupted:report(('status','System audio upload restored • screen sharing active'))
+                        if interrupted:report(('status','Shared audio upload restored • screen sharing active'))
                         interrupted=False;backoff=.3
                     # Diagnostic failures must never prevent subsequent audio uploads.
                     elif time.monotonic()-last_status>5:
@@ -80,25 +98,21 @@ def run(url,identity,token,stop,permission,report):
     cleanup_com=lambda:None
     try:
         sc,cleanup_com=load_audio_backend()
-        while not stop.is_set() and permission.is_set():
+        while not stop.is_set() and active():
             try:
-                speaker=sc.default_speaker()
-                if speaker is None:raise RuntimeError('No playback device. Connect speakers/headphones or enable a Windows output device.')
-                loopback=sc.get_microphone(id=str(speaker.id),include_loopback=True)
-                if not loopback.isloopback:raise RuntimeError('Playback loopback unavailable; no microphone will be opened.')
-                with loopback.recorder(samplerate=24000,channels=2,blocksize=4800) as recorder:
-                    check=time.monotonic()
-                    while permission.is_set() and not stop.is_set():
-                        samples=recorder.record(numframes=4800)
-                        if stop.is_set() or not permission.is_set():break
-                        payload,level=pcm_wav(samples);newest(chunks,(time.monotonic(),payload))
-                        status('capturing','Capturing '+str(speaker.name),level)
-                        if time.monotonic()-check>2:
-                            check=time.monotonic();current=sc.default_speaker()
-                            if current is None or current.id!=speaker.id:break
+                mode=signature();devices=sources(sc,*mode)
+                with ExitStack() as stack:
+                    recorders=[stack.enter_context(device.recorder(samplerate=24000,channels=2,blocksize=4800)) for device in devices]
+                    while active() and not stop.is_set() and signature()==mode:
+                        import numpy as np
+                        parts=[recorder.record(numframes=4800) for recorder in recorders]
+                        if stop.is_set() or signature()!=mode:break
+                        samples=np.mean(parts,axis=0)
+                        payload,level=pcm_wav(samples);newest(chunks,(time.monotonic(),payload,mode))
+                        status('capturing','Sharing '+('system and microphone audio' if all(mode) else 'microphone / surrounding sound' if mode[1] else 'system playback audio'),level)
             except Exception as exc:
-                status('error',str(exc));report(('status','System audio: '+str(exc)[:140]));stop.wait(3)
+                status('error',str(exc));report(('status','Shared audio: '+str(exc)[:140]));stop.wait(3)
     except Exception as exc:
-        status('error',str(exc));report(('status','System audio unavailable: '+str(exc)[:140]));stop.wait(1.2)
+        status('error',str(exc));report(('status','Shared audio unavailable: '+str(exc)[:140]));stop.wait(1.2)
     finally:
         done.set();sender.join(timeout=3);cleanup_com()

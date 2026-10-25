@@ -12,7 +12,7 @@ pg.PAUSE=0
 
 class Companion:
     def __init__(self,root):
-        self.root=root;self.stop=threading.Event();self.allow=threading.Event();self.audio=threading.Event();self.files=threading.Event()
+        self.root=root;self.stop=threading.Event();self.allow=threading.Event();self.audio=threading.Event();self.mic=threading.Event();self.files=threading.Event()
         self.events=queue.Queue();self.credentials=None;self.running=False
         self.tray=None;self.tray_ready=threading.Event();self.exiting=False
         self.build_ui(root)
@@ -21,7 +21,7 @@ class Companion:
             saved=local_settings.load()
             if saved:
                 self.credentials=saved;self.url.set(saved['url']);self.unattended.set(True);self.background.set(bool(saved.get('background',False)))
-                for key,var,event in [('control',self.control,self.allow),('audio',self.system_audio,self.audio),('files',self.file_permission,self.files)]:
+                for key,var,event in [('control',self.control,self.allow),('audio',self.system_audio,self.audio),('microphone',self.microphone,self.mic),('files',self.file_permission,self.files)]:
                     var.set(bool(saved.get(key)));self.permission(var,event,False)
                 root.after(500,self.connect)
         except Exception as e:self.status.set('Could not load enrollment: '+str(e))
@@ -34,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='TyDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.1.2',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.2',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -58,9 +58,9 @@ class Companion:
         for label,var,secret in [('Server address',self.url,False),('Pairing code or connection passcode',self.code,True)]:
             tk.Label(f,text=label,bg=panel,fg=muted,font=('Segoe UI',9)).pack(anchor='w',pady=(4,4))
             tk.Entry(f,textvariable=var,show='•' if secret else '',bg='#0d1829',fg=ink,insertbackground=mint,relief='flat',highlightthickness=1,highlightbackground='#344964',highlightcolor=mint,font=('Segoe UI',11)).pack(fill='x',ipady=8,pady=(0,5))
-        self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar();self.background=tk.BooleanVar()
+        self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.microphone=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar();self.background=tk.BooleanVar()
         f=card('02  Choose what to share','Permissions apply only to this computer. You can disconnect at any time.')
-        for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · no microphone',self.system_audio,self.audio),('Files in TyDesk Shared and Inbox folders',self.file_permission,self.files)]:
+        for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · PC sounds',self.system_audio,self.audio),('Microphone · surrounding sound',self.microphone,self.mic),('Files in TyDesk Shared and Inbox folders',self.file_permission,self.files)]:
             ttk.Checkbutton(f,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e)).pack(anchor='w')
         ttk.Checkbutton(f,text='Remember this computer and reconnect automatically',variable=self.unattended,command=self.remember_changed).pack(anchor='w')
         ttk.Checkbutton(f,text='Keep available in the tray when I close this window',variable=self.background,command=self.background_changed).pack(anchor='w')
@@ -106,12 +106,15 @@ class Companion:
     def show(self):
         self.root.deiconify();self.root.lift();self.root.focus_force()
     def config(self):
-        return {**self.credentials,'control':self.control.get(),'audio':self.system_audio.get(),'files':self.file_permission.get(),'background':self.background.get()}
+        return {**self.credentials,'control':self.control.get(),'audio':self.system_audio.get(),'microphone':self.microphone.get(),'files':self.file_permission.get(),'background':self.background.get()}
     def save(self):
         if self.credentials and self.unattended.get():
             try:local_settings.save(self.config())
             except Exception as e:self.status.set('Could not save: '+str(e))
     def permission(self,var,event,persist=True):
+        if persist and var is self.microphone and var.get():
+            if not messagebox.askokcancel('Share microphone and surrounding sound?', 'The dashboard owner will be able to hear this computer’s microphone, including surrounding conversations. Sharing continues in tray mode if enabled. Uncheck Microphone, Disconnect, or Quit TyDesk to stop it. Remembered permissions can reconnect after sign-in.'):
+                var.set(False);return
         event.set() if var.get() else event.clear()
         if persist:self.save()
     def remember_changed(self):
@@ -169,11 +172,11 @@ class Companion:
                 try:
                     shot=pg.screenshot();shot.thumbnail((1600,1000));buf=io.BytesIO();shot.convert('RGB').save(buf,'JPEG',quality=65)
                     if stop.is_set():break
-                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape()},timeout=8)
+                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape()},timeout=8)
                     if r.status_code==401:raise PermissionError('Saved connection no longer exists. Paste a new pairing code or your reusable passcode, then Connect.')
                     r.raise_for_status()
-                    if self.audio.is_set() and (audio_thread is None or not audio_thread.is_alive()):
-                        audio_thread=start_audio(url,identity,credentials['token'],stop,self.audio,self.events.put)
+                    if (self.audio.is_set() or self.mic.is_set()) and (audio_thread is None or not audio_thread.is_alive()):
+                        audio_thread=start_audio(url,identity,credentials['token'],stop,self.audio,self.events.put,microphone=self.mic)
                     if self.files.is_set() and (file_thread is None or not file_thread.is_alive()):
                         file_thread=threading.Thread(target=self.file_worker,args=(base,credentials['token'],stop),daemon=True);file_thread.start()
                     stop.wait(.12)

@@ -78,3 +78,21 @@ class UploadRecoveryTests(unittest.TestCase):
   self.assertTrue(any('restored' in text for kind,text in reports))
   self.assertTrue(all(k['timeout'][1]>=15 for u,k in calls if u.endswith('/audio')))
  def test_diagnostics_timeout_does_not_block_audio(self):self.exercise(fail_status=True)
+
+class MicrophonePermissionTests(unittest.TestCase):
+ def test_microphone_is_not_opened_without_permission(self):
+  from unittest.mock import Mock
+  from audio_capture import sources
+  sc=Mock();sc.get_microphone.return_value.isloopback=True
+  self.assertEqual(len(sources(sc,True,False)),1);sc.default_microphone.assert_not_called()
+ def test_microphone_only_and_combined_sources(self):
+  from unittest.mock import Mock
+  from audio_capture import sources
+  sc=Mock();sc.default_microphone.return_value.isloopback=False;sc.get_microphone.return_value.isloopback=True
+  self.assertEqual(sources(sc,False,True),[sc.default_microphone.return_value]);sc.default_speaker.assert_not_called()
+  self.assertEqual(len(sources(sc,True,True)),2)
+ def test_no_default_or_loopback_microphone_is_rejected(self):
+  from unittest.mock import Mock
+  from audio_capture import sources
+  sc=Mock();sc.default_microphone.return_value=None
+  with self.assertRaises(RuntimeError):sources(sc,False,True)

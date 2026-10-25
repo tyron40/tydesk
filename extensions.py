@@ -81,7 +81,9 @@ def install(app, admin, device, devices, lock, data_dir, audit):
                 try:level=float(request.headers['X-Audio-Level'])
                 except ValueError:level=0
                 if not math.isfinite(level):level=0
-                d['audio_status']={'state':'capturing','message':'Receiving system playback audio','level':max(0,min(1,level)),'time':time.time()}
+                source=request.headers.get('X-Audio-Source','system')
+                if source not in ('system','microphone','both'):source='system'
+                d['audio_status']={'state':'capturing','source':source,'message':'Receiving shared audio','level':max(0,min(1,level)),'time':time.time()}
             d['audio_seq']+=1
             d['audio_chunks'].append((d['audio_seq'],time.time(),payload))
         return '',204
