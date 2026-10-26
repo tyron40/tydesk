@@ -48,7 +48,7 @@ class BrokerTests(unittest.TestCase):
         with wave.open(buf,'wb') as w:
             w.setnchannels(2);w.setsampwidth(2);w.setframerate(24000);w.writeframes(b'\x00'*38400)
         self.assertEqual(self.c.post(path+'/audio',headers=agent,data=buf.getvalue()).status_code,204)
-        chunks=self.c.get(path+'/audio',headers=self.admin).json['chunks']
+        result=self.c.get(path+'/audio',headers=self.admin).json;self.assertEqual(result['stream'],server.devices[d['id']]['audio_stream']);chunks=result['chunks']
         self.assertEqual(len(chunks),1)
         self.assertEqual(self.c.get(path+'/audio?after='+str(chunks[0]['seq']),headers=self.admin).json['chunks'],[])
         self.assertEqual(self.c.post(path+'/audio',headers=agent,data=b'not wav').status_code,400)

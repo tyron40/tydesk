@@ -41,3 +41,13 @@ function fixture(){const nodes=new Map(),events={},opened=[],requests=[];const n
  vm.runInContext('audioSeq=1;audioPlayer.push=()=>null',f.c);await vm.runInContext('pollAudio(audioGeneration)',f.c);assert.equal(vm.runInContext('audioSeq',f.c),1,'Backpressure must not acknowledge unplayed audio');
  console.log('PASS: dashboard preserves every pending audio chunk and does not acknowledge dropped playback');
 })().catch(e=>{console.error(e);process.exit(1)});
+
+(async()=>{
+ const f=fixture(),urls=[];let calls=0;
+ f.c.fetch=async url=>{urls.push(url);return{ok:true,status:200,json:async()=>({stream:'new-stream',status:{source:'microphone'},chunks:calls++===0?[]:[{seq:1,wav:'sample'}]})}};
+ f.c.ZDeskAudio.recentChunks=x=>x;
+ vm.runInContext("password='test-audio';selected='one';audioSeq=10000;audioStream='previous-stream';audioPlayer.context={state:'running'};audioPlayer.resets=0;audioPlayer.reset=()=>audioPlayer.resets++;audioPlayer.push=()=>({peak:.2})",f.c);
+ await vm.runInContext('pollAudio(audioGeneration)',f.c);assert.equal(vm.runInContext('audioSeq',f.c),0);assert.equal(vm.runInContext('audioPlayer.resets',f.c),1);
+ await vm.runInContext('pollAudio(audioGeneration)',f.c);assert(urls[1].endsWith('after=0'));assert.equal(vm.runInContext('audioSeq',f.c),1);
+ console.log('PASS: listening recovers when a broker restart resets audio sequence numbers');
+})().catch(e=>{console.error(e);process.exit(1)});

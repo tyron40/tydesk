@@ -23,7 +23,8 @@ class Player{
   const source=ctx.createBufferSource();source.buffer=buffer;source.connect(this.gain);this.sources.add(source);source.onended=()=>{this.sources.delete(source);source.disconnect()};
   if(!this.started||this.next<ctx.currentTime+.015){if(this.started){this.underruns++;this.delay=Math.min(1.4,this.delay+.2)}this.next=ctx.currentTime+this.delay;this.started=true}source.start(this.next);this.next+=buffer.duration;return pcm;
  }
- stop(){this.generation++;for(const s of this.sources){try{s.stop();s.disconnect()}catch{}}this.sources.clear();if(this.context)this.context.close().catch(()=>{});this.context=null;this.next=0;this.started=false;this.delay=.8;this.underruns=0}
+ reset(){for(const s of this.sources){try{s.stop();s.disconnect()}catch{}}this.sources.clear();this.next=0;this.started=false;this.delay=.8;this.underruns=0}
+ stop(){this.generation++;this.reset();if(this.context)this.context.close().catch(()=>{});this.context=null}
 }
 function recentChunks(chunks,seconds=1){let duration=0,start=chunks.length;while(start>0&&duration<seconds){start--;const bytes=Uint8Array.from(atob(chunks[start].wav),c=>c.charCodeAt(0));duration+=pcmWave(bytes).frames/24000}return chunks.slice(start)}
 root.ZDeskAudio={Player,pcmWave,recentChunks};if(typeof module!=='undefined')module.exports=root.ZDeskAudio;

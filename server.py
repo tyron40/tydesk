@@ -24,7 +24,7 @@ def audit(identity, event):
     db.commit()
 def fresh(token, name):
     return dict(token=token, name=name, seen=0, frame=b'', commands=deque(maxlen=50), control=False,
-        camera=False, camera_frame=b'', camera_seen=0, audio=False, files=False, audio_chunks=deque(maxlen=32), audio_seq=0, share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
+        camera=False, camera_frame=b'', camera_seen=0, audio=False, files=False, audio_chunks=deque(maxlen=32), audio_seq=0, audio_stream=secrets.token_hex(8), share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
 if device_registry.ENABLED:
     # Durable registry is authoritative. Never resurrect locally cached revocations.
     rows=device_registry.list_devices()

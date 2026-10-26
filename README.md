@@ -202,3 +202,5 @@ Capture now keeps a bounded three-second queue instead of replacing pending micr
 The broker accepts valid stereo 24 kHz / 16-bit PCM batches up to two seconds, and retains only a bounded current four-second memory window. The dashboard consumes every pending sequence instead of keeping just the final three packets. Playback starts with an 800 ms jitter buffer and adapts up to 1.4 seconds after an underrun. It does not acknowledge packets that have not been scheduled. Initial listening starts near live sound, and stopping sharing clears pending queues; no audio recording is added. A sustained network outage can still interrupt playback.
 
 Regression tests simulate slow status requests, queued upload bursts and variable playback arrival times, verify contiguous playback schedules, batch sample order, stale/disabled-source rejection and Android queue bounds. Actual microphone hardware and the user's connection still need listening tests.
+
+Audio responses also include a per-stream identifier. Dashboard playback resets its sequence tracking after a broker restart, so a restarted server cannot leave the listener waiting for an old sequence counter to catch up.

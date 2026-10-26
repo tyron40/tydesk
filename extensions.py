@@ -98,7 +98,7 @@ def install(app, admin, device, devices, lock, data_dir, audit):
             if not d or not d['audio'] or time.time()-d['seen']>=8: abort(409)
             status=dict(d['audio_status'])
             if status.get('time') and time.time()-status['time']>5:status={'state':'waiting','message':'No recent capture status; check the companion'}
-            return jsonify(status=status,chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<4])
+            return jsonify(status=status,stream=d['audio_stream'],latest_seq=d['audio_seq'],chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<4])
     @app.post('/api/devices/<identity>/shares')
     def shares(identity):
         with lock:
