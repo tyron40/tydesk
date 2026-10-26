@@ -1,7 +1,7 @@
 """Explicit platform capabilities for the visible desktop companion."""
 import os,sys
 from pathlib import Path
-VERSION='3.7'
+VERSION='3.8'
 def platform_id():return {'win32':'windows','darwin':'macos'}.get(sys.platform,'linux' if sys.platform.startswith('linux') else 'unknown')
 def label():return {'windows':'WINDOWS','macos':'MAC','linux':'LINUX'}.get(platform_id(),'DESKTOP')
 def system_audio_available():return sys.platform!='darwin'

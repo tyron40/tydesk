@@ -33,3 +33,11 @@ function fixture(){const nodes=new Map(),events={},opened=[],requests=[];const n
  assert(!vm.runInContext("document.body.classList.contains('session-expanded')",f.c));
  console.log('PASS: mobile fullscreen fallback, orientation resize fit, page scrolling restored');
 })().catch(e=>{console.error(e);process.exit(1)});
+
+(async()=>{
+ const f=fixture();f.c.fetch=async()=>({ok:true,status:200,json:async()=>({status:{source:'microphone'},chunks:Array.from({length:7},(_,i)=>({seq:i+2,wav:'sample'}))})});
+ vm.runInContext("password='test-audio';selected='one';audioSeq=1;audioPlayer.context={state:'running'};audioPlayer.received=[];audioPlayer.push=wav=>{audioPlayer.received.push(wav);return{peak:.2}}",f.c);
+ await vm.runInContext('pollAudio(audioGeneration)',f.c);assert.equal(vm.runInContext('audioPlayer.received.length',f.c),7,'Poll must preserve all pending audio, including chunks older than the last three');assert.equal(vm.runInContext('audioSeq',f.c),8);
+ vm.runInContext('audioSeq=1;audioPlayer.push=()=>null',f.c);await vm.runInContext('pollAudio(audioGeneration)',f.c);assert.equal(vm.runInContext('audioSeq',f.c),1,'Backpressure must not acknowledge unplayed audio');
+ console.log('PASS: dashboard preserves every pending audio chunk and does not acknowledge dropped playback');
+})().catch(e=>{console.error(e);process.exit(1)});

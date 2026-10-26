@@ -96,3 +96,42 @@ class MicrophonePermissionTests(unittest.TestCase):
   from audio_capture import sources
   sc=Mock();sc.default_microphone.return_value=None
   with self.assertRaises(RuntimeError):sources(sc,False,True)
+
+class OrderedAudioBatchTests(unittest.TestCase):
+ def packet(self,value):return pcm_wav(np.full((4800,2),value,dtype=float))[0]
+ def test_slow_upload_batches_every_sample_in_order(self):
+  from audio_capture import take_batch
+  q=queue.Queue(maxsize=15);mode=(False,True)
+  packets=[self.packet(value/10) for value in range(1,6)]
+  for packet in packets[1:]:q.put((10,packet,mode))
+  joined=take_batch((10,packets[0],mode),q,mode,now=11)
+  with wave.open(io.BytesIO(joined),'rb') as w:
+   self.assertEqual(w.getnframes(),24000)
+   samples=np.frombuffer(w.readframes(24000),dtype='<i2').reshape(-1,2)
+  for i in range(5):self.assertEqual(samples[i*4800,0],int((i+1)/10*32767))
+  self.assertTrue(q.empty())
+ def test_stale_chunks_and_revoked_microphone_mode_are_not_uploaded(self):
+  from audio_capture import take_batch
+  q=queue.Queue();packet=self.packet(.1)
+  self.assertIsNone(take_batch((0,packet,(False,True)),q,(False,True),now=4))
+  self.assertIsNone(take_batch((4,packet,(False,True)),q,(True,False),now=4))
+ def test_slow_diagnostics_do_not_hold_up_microphone_uploads(self):
+  import threading,time
+  from unittest.mock import Mock,patch
+  import audio_capture
+  stop=threading.Event();permission=threading.Event();permission.set();diagnosing=threading.Event();finish=threading.Event();delivered=threading.Event()
+  recorder=Mock();recorder.__enter__=Mock(return_value=recorder);recorder.__exit__=Mock(return_value=False)
+  def record(**kw):time.sleep(.25);return np.zeros((4800,2))
+  recorder.record.side_effect=record
+  loop=Mock(isloopback=True);loop.recorder.return_value=recorder
+  backend=Mock();backend.default_speaker.return_value=Mock(id='speaker');backend.get_microphone.return_value=loop
+  session=Mock();session.headers={};session.__enter__=Mock(return_value=session);session.__exit__=Mock(return_value=False)
+  def post(url,**kw):
+   if url.endswith('/audio-status'):diagnosing.set();finish.wait(3)
+   else:delivered.set();stop.set()
+   return Mock(status_code=204)
+  session.post.side_effect=post
+  with patch.object(audio_capture,'load_audio_backend',return_value=(backend,lambda:None)),patch('requests.Session',return_value=session):
+   worker=threading.Thread(target=audio_capture.run,args=('https://test.invalid','device','test-token',stop,permission,Mock()));worker.start()
+   try:self.assertTrue(diagnosing.wait(1));self.assertTrue(delivered.wait(1),'Audio must upload while diagnostics are still waiting')
+   finally:finish.set();stop.set();worker.join(3)

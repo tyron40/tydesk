@@ -38,9 +38,9 @@ function fixture(){
  f.control.points.get(1).time-=600;f.control.move(f.e(1,70,50));f.control.up(f.e(1,70,50));
  assert.deepEqual(f.sent.map(v=>v.type),['pointer_down','move','pointer_up'],'Hold then move drags in trackpad mode');
 }
-function wave(){const b=Buffer.alloc(44+4800*4);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(2,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(96000,28);b.writeUInt16LE(4,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);for(let i=0;i<4800;i++){const v=Math.round(Math.sin(i/24000*2*Math.PI*440)*10000);b.writeInt16LE(v,44+i*4);b.writeInt16LE(v,46+i*4)}return b}
+function wave(frames=4800){const b=Buffer.alloc(44+frames*4);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(2,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(96000,28);b.writeUInt16LE(4,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);for(let i=0;i<frames;i++){const v=Math.round(Math.sin(i/24000*2*Math.PI*440)*10000);b.writeInt16LE(v,44+i*4);b.writeInt16LE(v,46+i*4)}return b}
 (async()=>{
- const bytes=wave(),pcm=pcmWave(bytes);assert.equal(pcm.frames,4800);assert(pcm.peak>.3);assert.throws(()=>pcmWave(bytes.subarray(0,60)));
+ const bytes=wave(),pcm=pcmWave(bytes);assert.equal(pcm.frames,4800);assert.equal(pcmWave(wave(24000)).frames,24000);assert(pcm.peak>.3);assert.throws(()=>pcmWave(bytes.subarray(0,60)));
  let stopped=0,closed=0;
  global.AudioContext=class{constructor(){this.state='suspended';this.currentTime=0;this.destination={}}async resume(){this.state='running'}createGain(){return{gain:{value:1},connect(){}}}createBuffer(n,f){const c=[new Float32Array(f),new Float32Array(f)];return{duration:f/24000,getChannelData:i=>c[i]}}createBufferSource(){return{connect(){},disconnect(){},start(){},stop(){stopped++}}}async close(){closed++}};
  const player=new Player();await player.start();assert.equal(player.context.state,'running');player.push(bytes.toString('base64'));assert.equal(player.sources.size,1);player.setVolume(.5);assert.equal(player.gain.gain.value,.5);player.stop();assert.equal(stopped,1);assert.equal(closed,1);assert.equal(player.context,null);
@@ -51,12 +51,29 @@ function wave(){const b=Buffer.alloc(44+4800*4);b.write('RIFF');b.writeUInt32LE(
  const vm=require('node:vm'),fs=require('node:fs');
  function browserOptions(screenAvailable){
   const nodes=new Map(),node=()=>({checked:false,disabled:false});let prompts=0;
-  const c={document:{querySelector:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},createElement:()=>({getContext:()=>({})})},navigator:{mediaDevices:{getDisplayMedia:screenAvailable?()=>{prompts++}:undefined,getUserMedia:()=>{prompts++}}},window:{addEventListener(){}},Map,Set,console};
+  const c={AbortSignal,document:{querySelector:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},createElement:()=>({getContext:()=>({})})},navigator:{mediaDevices:{getDisplayMedia:screenAvailable?()=>{prompts++}:undefined,getUserMedia:()=>{prompts++}}},window:{addEventListener(){}},Map,Set,console};
   vm.createContext(c);vm.runInContext(fs.readFileSync('static/browser-companion.js','utf8'),c);
   vm.runInContext("$('#selectAll').onclick()",c);
   assert.equal(nodes.get('#screenPermission').checked,screenAvailable);assert(nodes.get('#micPermission').checked);assert(nodes.get('#filePermission').checked);assert.equal(prompts,0,'Select all must not request permissions or start capture');
-  nodes.get('#micPermission').checked=false;vm.runInContext("device={id:'active'};$('#selectAll').onclick()",c);assert.equal(nodes.get('#micPermission').checked,false,'Active sharing options remain locked');
+  nodes.get('#micPermission').checked=false;vm.runInContext("device={id:'active'};$('#selectAll').onclick()",c);assert.equal(nodes.get('#micPermission').checked,false,'Active sharing options remain locked');return c;
  }
- browserOptions(true);browserOptions(false);
+ const c=browserOptions(true);browserOptions(false);
+ (async()=>{const uploads=[];c.fetch=async(url,options)=>{uploads.push(options.body);return{ok:true,status:204}};
+ vm.runInContext("device={id:'test',token:'test-token'};generation=9;pendingAudio=Array.from({length:5},()=>({time:Date.now(),wav:encodeMic(new Float32Array(9600),48000)}))",c);
+ await vm.runInContext('sendAudio(9)',c);assert.equal(uploads.length,1);assert.equal(pcmWave(new Uint8Array(uploads[0])).frames,24000);
+ console.log('PASS: browser microphone batches all five delayed capture packets into one ordered second');
+ })().catch(e=>{console.error(e);process.exit(1)});
  console.log('PASS: browser Select all respects screen support and does not start capture or request permissions');
 }
+
+(async()=>{
+ const {Player,recentChunks}=require('./static/system-audio.js');const scheduled=[];
+ const old=global.AudioContext;
+ global.AudioContext=class{constructor(){this.state='suspended';this.currentTime=0;this.destination={}}async resume(){this.state='running'}createGain(){return{gain:{value:1},connect(){}}}createBuffer(n,f){const data=[new Float32Array(f),new Float32Array(f)];return{duration:f/24000,getChannelData:i=>data[i]}}createBufferSource(){return{connect(){},disconnect(){},start(time){scheduled.push({time,duration:this.buffer.duration})},stop(){}}}async close(){}};
+ const player=new Player();await player.start();const pcm=wave().toString('base64');
+ for(const [time,count] of [[0,2],[.48,2],[1.08,3],[1.65,2]]){player.context.currentTime=time;for(let i=0;i<count;i++)assert(player.push(pcm),'Normal network jitter must not discard audio')}
+ assert.equal(scheduled.length,9);for(let i=1;i<scheduled.length;i++)assert(Math.abs(scheduled[i].time-(scheduled[i-1].time+scheduled[i-1].duration))<1e-9,'Audio buffers must play contiguously');assert.equal(player.underruns,0);
+ player.context.currentTime=6;player.push(pcm);assert.equal(player.underruns,1);assert(scheduled.at(-1).time>=7,'A real outage must rebuild its playback buffer');player.stop();global.AudioContext=old;
+ const chunks=Array.from({length:8},(_,i)=>({seq:i+1,wav:pcm}));assert.deepEqual(recentChunks(chunks).map(x=>x.seq),[4,5,6,7,8]);
+ console.log('PASS: jittered packet arrivals play contiguously, no normal backlog dropping, bounded initial live playback and outage rebuffering');
+})().catch(e=>{console.error(e);process.exit(1)});

@@ -193,3 +193,12 @@ Mac and Linux native apps share the same visible UI, pairing, local camera/micro
 Saved Windows enrollment stays DPAPI-protected. Mac and Linux enrollment uses the OS Keychain, Secret Service or KWallet and refuses plaintext storage. If the secure store is absent or locked, manual pairing remains available; remembered pairing requires unlocking/configuring the secure store. Login startup and shortcuts are explicit local actions and run as the signed-in user. Remote uninstall is still advertised only by the Windows and Android builds that implement it.
 
 The Mac/Linux workflow builds on each matching OS and CPU, runs platform tests and exercises the actual packaged UI without requesting capture permissions, before publishing downloads. Mac bundles are ad-hoc signed development apps, not Apple-notarized releases. These automated tests do not certify every laptop model, camera, audio driver, display setup or restricted device. Hardware testing is still required.
+
+
+### Microphone continuity (desktop 3.8 / Android 1.5)
+
+Capture now keeps a bounded three-second queue instead of replacing pending microphone audio. Desktop, Android and browser companions combine consecutive chunks into up-to-one-second WAV uploads, reducing round-trip overhead while preserving sample order. Desktop capture diagnostics use a separate connection so a slow status request cannot block sound uploads.
+
+The broker accepts valid stereo 24 kHz / 16-bit PCM batches up to two seconds, and retains only a bounded current four-second memory window. The dashboard consumes every pending sequence instead of keeping just the final three packets. Playback starts with an 800 ms jitter buffer and adapts up to 1.4 seconds after an underrun. It does not acknowledge packets that have not been scheduled. Initial listening starts near live sound, and stopping sharing clears pending queues; no audio recording is added. A sustained network outage can still interrupt playback.
+
+Regression tests simulate slow status requests, queued upload bursts and variable playback arrival times, verify contiguous playback schedules, batch sample order, stale/disabled-source rejection and Android queue bounds. Actual microphone hardware and the user's connection still need listening tests.

@@ -23,6 +23,28 @@ def newest(q,value):
         try:q.put_nowait(value)
         except queue.Full:pass
 
+def merge_wav(payloads):
+    """Combine consecutive capture chunks without re-sampling or dropping samples."""
+    data=[];frames=0
+    for payload in payloads:
+        with wave.open(io.BytesIO(payload),'rb') as wav:
+            if (wav.getnchannels(),wav.getsampwidth(),wav.getframerate())!=(2,2,24000):raise ValueError('Invalid audio format')
+            frames+=wav.getnframes();data.append(wav.readframes(wav.getnframes()))
+    if not 0<frames<=48000:raise ValueError('Audio batch exceeds two seconds')
+    output=io.BytesIO()
+    with wave.open(output,'wb') as wav:
+        wav.setnchannels(2);wav.setsampwidth(2);wav.setframerate(24000);wav.writeframes(b''.join(data))
+    return output.getvalue()
+
+def take_batch(first,chunks,mode,now=None):
+    now=time.monotonic() if now is None else now
+    entries=[first]
+    for _ in range(4):
+        try:entries.append(chunks.get_nowait())
+        except queue.Empty:break
+    payloads=[payload for stamp,payload,selected in entries if now-stamp<=3 and selected==mode]
+    return merge_wav(payloads) if payloads else None
+
 def initialize_audio_thread():
     """WASAPI requires COM on every capture thread, including after re-enabling audio."""
     if sys.platform!='win32':return lambda:None
@@ -59,11 +81,11 @@ def run(url,identity,token,stop,permission,report,microphone=None):
     microphone=microphone or threading.Event()
     signature=lambda:(permission.is_set(),microphone.is_set())
     active=lambda:any(signature())
-    chunks=queue.Queue(maxsize=3);done=threading.Event();state={'state':'waiting','message':'Starting system playback capture','level':0};state_lock=threading.Lock()
+    chunks=queue.Queue(maxsize=15);done=threading.Event();state={'state':'waiting','message':'Starting shared audio capture','level':0};state_lock=threading.Lock()
     def status(kind,message,level=0):
         with state_lock:state.update(state=kind,message=message[:160],level=level)
     def upload():
-        last_status=0;last_error=0;interrupted=False;backoff=.3
+        last_error=0;interrupted=False;backoff=.3
         with requests.Session() as session:
             session.headers['Authorization']='Bearer '+token
             while not stop.is_set() and not done.is_set() and active():
@@ -72,7 +94,9 @@ def run(url,identity,token,stop,permission,report,microphone=None):
                     except queue.Empty:payload=None
                     if stop.is_set() or done.is_set() or not active():return
                     if payload is not None:
-                        if time.monotonic()-stamp>.8 or mode!=signature():continue
+                        current=signature();payload=take_batch((stamp,payload,mode),chunks,current)
+                        if payload is None or current!=signature() or not active():continue
+                        mode=current
                         with state_lock:level=state['level']
                         r=session.post(f'{url}/api/devices/{identity}/audio',data=payload,
                             headers={'Content-Type':'audio/wav','X-Audio-Level':str(level),'X-Audio-Source':'both' if all(mode) else 'microphone' if mode[1] else 'system'},timeout=(5,15))
@@ -81,19 +105,23 @@ def run(url,identity,token,stop,permission,report,microphone=None):
                         r.raise_for_status()
                         if interrupted:report(('status','Shared audio upload restored • screen sharing active'))
                         interrupted=False;backoff=.3
-                    # Diagnostic failures must never prevent subsequent audio uploads.
-                    elif time.monotonic()-last_status>5:
-                        last_status=time.monotonic()
-                        with state_lock:data=dict(state)
-                        try:
-                            r=session.post(f'{url}/api/devices/{identity}/audio-status',json=data,timeout=(3,5))
-                            if r.status_code==401:stop.set();return
-                        except requests.RequestException:pass
                 except requests.RequestException:
                     interrupted=True
                     if time.monotonic()-last_error>5:
                         report(('status','Audio upload delayed • reconnecting automatically. Screen sharing remains available.'));last_error=time.monotonic()
                     stop.wait(backoff);backoff=min(3,backoff*2)
+    def diagnostics():
+        with requests.Session() as session:
+            session.headers['Authorization']='Bearer '+token
+            while not stop.is_set() and not done.is_set() and active():
+                with state_lock:data=dict(state)
+                if data['state']!='capturing':
+                    try:
+                        response=session.post(f'{url}/api/devices/{identity}/audio-status',json=data,timeout=(3,5))
+                        if response.status_code==401:stop.set();return
+                    except requests.RequestException:pass
+                done.wait(3)
+    diagnostic=threading.Thread(target=diagnostics,daemon=True);diagnostic.start()
     sender=threading.Thread(target=upload,daemon=True);sender.start()
     cleanup_com=lambda:None
     try:

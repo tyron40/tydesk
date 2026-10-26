@@ -71,10 +71,10 @@ def install(app, admin, device, devices, lock, data_dir, audit):
             d=device(identity)
             if not d['audio']: abort(409)
             payload=request.get_data()
-            if len(payload)>100000: abort(413)
+            if len(payload)>200000: abort(413)
             try:
                 with wave.open(io.BytesIO(payload),'rb') as w:
-                    if w.getnchannels()!=2 or w.getsampwidth()!=2 or w.getframerate()!=24000 or not 0<w.getnframes()<=12000: abort(400)
+                    if w.getnchannels()!=2 or w.getsampwidth()!=2 or w.getframerate()!=24000 or not 0<w.getnframes()<=48000: abort(400)
                     if len(w.readframes(w.getnframes()))!=w.getnframes()*4:abort(400)
             except (wave.Error,EOFError): abort(400)
             if 'X-Audio-Level' in request.headers:
@@ -84,6 +84,7 @@ def install(app, admin, device, devices, lock, data_dir, audit):
                 source=request.headers.get('X-Audio-Source','system')
                 if source not in ('system','microphone','both'):source='system'
                 d['audio_status']={'state':'capturing','source':source,'message':'Receiving shared audio','level':max(0,min(1,level)),'time':time.time()}
+            while d['audio_chunks'] and time.time()-d['audio_chunks'][0][1]>=4:d['audio_chunks'].popleft()
             d['audio_seq']+=1
             d['audio_chunks'].append((d['audio_seq'],time.time(),payload))
         return '',204
@@ -97,7 +98,7 @@ def install(app, admin, device, devices, lock, data_dir, audit):
             if not d or not d['audio'] or time.time()-d['seen']>=8: abort(409)
             status=dict(d['audio_status'])
             if status.get('time') and time.time()-status['time']>5:status={'state':'waiting','message':'No recent capture status; check the companion'}
-            return jsonify(status=status,chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<2])
+            return jsonify(status=status,chunks=[dict(seq=s,wav=base64.b64encode(b).decode()) for s,stamp,b in d['audio_chunks'] if s>after and time.time()-stamp<4])
     @app.post('/api/devices/<identity>/shares')
     def shares(identity):
         with lock:

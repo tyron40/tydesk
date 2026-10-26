@@ -14,7 +14,7 @@ public class MainActivity extends Activity {
  EditText server,code;CheckBox screen,mic,control,files,camera;Spinner cameraFacing;boolean wasSharing=false;TextView status;String lastStatus="";Button start;java.io.File export;boolean reviewingRemoval=false;
  final Handler handler=new Handler(Looper.getMainLooper());
  public void onCreate(Bundle state){super.onCreate(state);getWindow().setStatusBarColor(0xff101b2b);ScrollView scroll=new ScrollView(this);LinearLayout layout=new LinearLayout(this);layout.setOrientation(LinearLayout.VERTICAL);layout.setPadding(32,36,32,36);layout.setBackgroundColor(0xff101b2b);scroll.addView(layout);setContentView(scroll);int padding=Math.round(20*getResources().getDisplayMetrics().density);scroll.setOnApplyWindowInsetsListener((v,insets)->{int top=insets.getSystemWindowInsetTop(),bottom=insets.getSystemWindowInsetBottom();layout.setPadding(padding,padding+top,padding,padding+bottom);return insets;});
-  label(layout,"ZDesk",32);label(layout,"ANDROID COMPANION · 1.4",12);label(layout,"Connect your phone. Stay in control.",21);
+  label(layout,"ZDesk",32);label(layout,"ANDROID COMPANION · 1.5",12);label(layout,"Connect your phone. Stay in control.",21);
   label(layout,"Server address",14);server=new EditText(this);server.setSingleLine();server.setText(getPreferences(0).getString("server","https://zdesk-nnym.onrender.com"));layout.addView(server);
   label(layout,"Connection passcode or one-use code (blank to use saved pairing)",14);code=new EditText(this);code.setSingleLine();code.setInputType(129);layout.addView(code);
   button(layout,"Select all sharing features",()->selectAll(true));button(layout,"Clear all",()->selectAll(false));

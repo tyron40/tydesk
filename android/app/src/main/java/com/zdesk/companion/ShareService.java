@@ -25,7 +25,8 @@ public class ShareService extends Service {
  static volatile int deviceWidth=1080,deviceHeight=1920;
  volatile boolean running=false;boolean mic,screen,files;volatile boolean camera;CameraFeed cameraFeed;Api api;String id,url;JSONObject enrollment;
  MediaProjection projection;VirtualDisplay display;ImageReader reader;HandlerThread captureThread;Handler capture;final Handler main=new Handler(Looper.getMainLooper());
- final AtomicReference<byte[]> frame=new AtomicReference<>(),audio=new AtomicReference<>();
+ final AtomicReference<byte[]> frame=new AtomicReference<>();
+ final AudioPackets audio=new AudioPackets();
  final ExecutorService workers=Executors.newFixedThreadPool(5);
  long encodedAt=0;int width,height,density;Map<String,Uri> shares=new HashMap<>();Set<String> finished=new HashSet<>();
  final String channel="zdesk-sharing";
@@ -64,10 +65,10 @@ public class ShareService extends Service {
   if(checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=android.content.pm.PackageManager.PERMISSION_GRANTED)throw new IOException("Microphone permission is off");
   int rate=24000,size=Math.max(9600,AudioRecord.getMinBufferSize(rate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT));
   recorder=new AudioRecord(MediaRecorder.AudioSource.MIC,rate,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,size*2);if(recorder.getState()!=AudioRecord.STATE_INITIALIZED)throw new IOException("Microphone is unavailable");recorder.startRecording();final AudioRecord source=recorder;
-  Thread sender=new Thread(()->{while(running){byte[] b=audio.getAndSet(null);if(b!=null)try{api.call(base()+"/audio","POST",b,audioHeaders());}catch(Exception e){if(revoked(e))return;notice("Microphone upload delayed; retrying.");}pause(100);}},"ZDesk microphone upload");sender.start();
-  short[] mono=new short[4800];while(running){int count=0;while(running&&count<mono.length){int n=source.read(mono,count,mono.length-count);if(n<0)throw new IOException("Microphone capture failed");count+=n;}if(running)audio.set(wav(mono,count));}
+  Thread sender=new Thread(()->{while(running){try{byte[] b=audio.pollBatch(200);if(b!=null&&running)api.call(base()+"/audio","POST",b,audioHeaders());}catch(InterruptedException e){Thread.currentThread().interrupt();return;}catch(Exception e){if(revoked(e))return;notice("Microphone upload delayed; retrying.");pause(100);}}},"ZDesk microphone upload");sender.start();
+  short[] mono=new short[4800];while(running){int count=0;while(running&&count<mono.length){int n=source.read(mono,count,mono.length-count);if(n<0)throw new IOException("Microphone capture failed");count+=n;}if(running)audio.offer(wav(mono,count));}
  }catch(Exception e){notice("Microphone unavailable. Check Android microphone permission and input.");try{api.json(base()+"/audio-status","POST",new JSONObject().put("state","error").put("message","Android microphone capture unavailable").put("level",0));}catch(Exception ignored){}}
- finally{if(recorder!=null){try{recorder.stop();}catch(Exception ignored){}recorder.release();}}}
+ finally{audio.clear();if(recorder!=null){try{recorder.stop();}catch(Exception ignored){}recorder.release();}}}
  static Map<String,String> audioHeaders(){Map<String,String> h=new HashMap<>();h.put("Content-Type","audio/wav");h.put("X-Audio-Source","microphone");h.put("X-Audio-Level","0");return h;}
  static byte[] wav(short[] samples,int count){ByteBuffer b=ByteBuffer.allocate(44+count*4).order(ByteOrder.LITTLE_ENDIAN);b.put(new byte[]{'R','I','F','F'}).putInt(36+count*4).put(new byte[]{'W','A','V','E','f','m','t',' '}).putInt(16).putShort((short)1).putShort((short)2).putInt(24000).putInt(96000).putShort((short)4).putShort((short)16).put(new byte[]{'d','a','t','a'}).putInt(count*4);for(int i=0;i<count;i++)b.putShort(samples[i]).putShort(samples[i]);return b.array();}
  byte[] statusFrame(){Bitmap bitmap=Bitmap.createBitmap(800,450,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);canvas.drawColor(0xff152237);Paint paint=new Paint();paint.setColor(0xff51e2c0);paint.setTextSize(32);canvas.drawText("ZDesk Android companion",40,150,paint);paint.setTextSize(22);canvas.drawText("Camera / audio / selected files · screen not shared",40,230,paint);ByteArrayOutputStream out=new ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.JPEG,60,out);bitmap.recycle();return out.toByteArray();}

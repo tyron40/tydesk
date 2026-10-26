@@ -54,6 +54,21 @@ class BrokerTests(unittest.TestCase):
         self.assertEqual(self.c.post(path+'/audio',headers=agent,data=b'not wav').status_code,400)
         self.c.post(path+'/frame',headers={**agent,'Content-Type':'image/jpeg'},data=b'frame')
         self.assertEqual(self.c.get(path+'/audio',headers=self.admin).status_code,409)
+    def test_batched_audio_and_network_jitter_preserve_order_with_bounded_age(self):
+        import io,wave,base64,time
+        d,_=self.enroll();path,agent=self.online(d)
+        def packet(frames):
+            buf=io.BytesIO()
+            with wave.open(buf,'wb') as w:w.setnchannels(2);w.setsampwidth(2);w.setframerate(24000);w.writeframes(b'\x00'*(frames*4))
+            return buf.getvalue()
+        for _ in range(10):self.assertEqual(self.c.post(path+'/audio',headers=agent,data=packet(4800)).status_code,204)
+        # This used to be limited to eight packets and two seconds.
+        chunks=server.devices[d['id']]['audio_chunks'];seq,_,payload=chunks[0];chunks[0]=(seq,time.time()-3,payload)
+        received=self.c.get(path+'/audio',headers=self.admin).json['chunks'];self.assertEqual([c['seq'] for c in received],list(range(1,11)))
+        self.assertEqual(self.c.post(path+'/audio',headers=agent,data=packet(24000)).status_code,204)
+        self.assertEqual(self.c.post(path+'/audio',headers=agent,data=packet(48001)).status_code,400)
+        seq,_,payload=chunks[0];chunks[0]=(seq,time.time()-5,payload)
+        self.assertEqual(self.c.get(path+'/audio',headers=self.admin).json['chunks'][0]['seq'],2)
     def test_bidirectional_file_transfer_and_revocation(self):
         d,_=self.enroll();path,agent=self.online(d)
         upload=self.c.post(path+'/files',headers={**self.admin,'X-Filename':'hello.txt'},data=b'hello')
