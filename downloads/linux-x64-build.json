@@ -1,9 +1,9 @@
 {
-  "version": "3.7",
-  "source_commit": "eb76ae1f981580f20afe6933bee1c66df5ebb387",
+  "version": "3.8",
+  "source_commit": "9ae7978e3ed97fba50ace2b1774c8ef7fa1c4485",
   "architecture": "x64",
   "platform": "linux",
-  "sha256": "9af9ca776a504976c889f7d41d11a7d695b002342892835ffda04452a5561b06",
+  "sha256": "a82e7b4e1e64f43e92d54104953d88f7a57c8b16707a9b3dd7ea6729c92c71d2",
   "development_build": true,
   "notarized": false,
   "hardware_tested": false,

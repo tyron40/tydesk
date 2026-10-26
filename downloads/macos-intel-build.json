@@ -1,9 +1,9 @@
 {
-  "version": "3.7",
-  "source_commit": "eb76ae1f981580f20afe6933bee1c66df5ebb387",
+  "version": "3.8",
+  "source_commit": "9ae7978e3ed97fba50ace2b1774c8ef7fa1c4485",
   "architecture": "x64",
   "platform": "macos",
-  "sha256": "3f83a3f842e659e175c86fdb82de70ee86bde723cd4b120c6a8995e18aca0053",
+  "sha256": "faa9c65306b817f64c509325c6d4848cca1611557a6032de773eb84e223f51e1",
   "development_build": true,
   "notarized": false,
   "hardware_tested": false,
