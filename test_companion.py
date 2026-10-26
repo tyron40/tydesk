@@ -11,6 +11,24 @@ class CompanionTests(unittest.TestCase):
   a.unattended=Mock();a.unattended.get.return_value=True;a.background=Mock();a.background.get.return_value=True
   a.start=Mock();a.status=Mock();a.stop=threading.Event();a.events=queue.Queue();a.allow=threading.Event();a.audio=threading.Event();a.files=threading.Event();a.camera=threading.Event();a.camera_permission=Mock();a.camera_status=Mock();a.tray=None
   return a
+ def test_camera_consent_is_saved_and_stop_camera_revokes_saved_choice(self):
+  a=self.app();a.camera_permission.get.return_value=True;a.save=Mock()
+  with patch('agent.messagebox.askokcancel',return_value=True):a.camera_changed()
+  self.assertTrue(a.camera.is_set());a.save.assert_called_once()
+  a.stop_camera();self.assertFalse(a.camera.is_set());a.camera_permission.set.assert_called_with(False)
+  self.assertEqual(a.save.call_count,2)
+ def test_camera_consent_cancel_does_not_start_or_save(self):
+  a=self.app();a.camera_permission.get.return_value=True;a.save=Mock()
+  with patch('agent.messagebox.askokcancel',return_value=False):a.camera_changed()
+  self.assertFalse(a.camera.is_set());a.save.assert_not_called()
+ def test_camera_setting_survives_disconnect_but_hardware_stops(self):
+  a=self.app();a.camera.set();a.camera_permission.get.return_value=True
+  a.disconnect();self.assertFalse(a.camera.is_set());self.assertTrue(a.stop.is_set())
+  a.camera_permission.set.assert_not_called()
+ def test_selected_camera_resumes_on_connect(self):
+  a=self.app();a.camera_permission.get.return_value=True
+  with patch('agent.threading.Thread'):a.connect()
+  self.assertTrue(a.camera.is_set())
  def test_new_code_overrides_stale_saved_enrollment(self):
   a=self.app();a.code.get.return_value='fresh-pairing-code'
   with patch('agent.threading.Thread') as thread,patch('agent.messagebox.askokcancel',return_value=True):

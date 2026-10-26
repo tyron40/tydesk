@@ -1,10 +1,32 @@
-"""Visible, locally opted-in Windows webcam sharing, never saved or auto-enabled."""
+"""Visible, locally opted-in Windows webcam sharing, with automatic camera detection and immediate local Stop."""
 import threading
 import queue
 import requests
 
 
-def run(base, token, stop, allowed, notify, index=0):
+def open_camera(cv, stop, allowed, index=None):
+    # Try the default first, then alternate Windows capture backends/devices.
+    for device in ([index] if index is not None else range(4)):
+        for backend in (cv.CAP_DSHOW, cv.CAP_MSMF):
+            if stop.is_set() or not allowed.is_set():return None, None
+            capture=None
+            try:
+                capture=cv.VideoCapture(device, backend)
+                if capture.isOpened():
+                    capture.set(cv.CAP_PROP_FRAME_WIDTH,640)
+                    capture.set(cv.CAP_PROP_FRAME_HEIGHT,480)
+                    for _ in range(3):
+                        if stop.is_set() or not allowed.is_set():break
+                        ok,frame=capture.read()
+                        if ok and frame is not None:return capture,frame
+            except Exception:
+                pass
+            if capture is not None:capture.release()
+    if stop.is_set() or not allowed.is_set():return None,None
+    raise RuntimeError('No working camera found. Check the camera privacy switch, Windows Settings > Privacy & security > Camera > desktop app access, and close other camera apps.')
+
+
+def run(base, token, stop, allowed, notify, index=None):
     capture = None;failed=False;done=threading.Event();latest=queue.Queue(maxsize=1)
     def upload():
         with requests.Session() as session:
@@ -23,15 +45,13 @@ def run(base, token, stop, allowed, notify, index=0):
     try:
         import cv2
         if not allowed.is_set() or stop.is_set():return
-        capture = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-        if not capture.isOpened():
-            raise RuntimeError('Camera unavailable. Check Windows camera privacy settings and other apps.')
-        capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        capture,first_frame=open_camera(cv2,stop,allowed,index)
+        if capture is None:return
         notify(('camera_status','Camera sharing ON · use Stop camera or Disconnect to stop'))
         threading.Thread(target=upload,daemon=True,name='ZDesk camera upload').start()
         while allowed.is_set() and not stop.is_set():
-            ok, frame = capture.read()
+            if first_frame is not None:ok,frame=True,first_frame;first_frame=None
+            else:ok,frame=capture.read()
             if not ok:raise RuntimeError('Camera capture stopped. Re-enable camera sharing to retry.')
             height,width=frame.shape[:2]
             if max(height,width)>960:
@@ -51,7 +71,7 @@ def run(base, token, stop, allowed, notify, index=0):
         if not failed:notify(('camera_status','Camera off'))
 
 
-def start(base, token, stop, allowed, notify, index=0):
+def start(base, token, stop, allowed, notify, index=None):
     worker=threading.Thread(target=run,args=(base,token,stop,allowed,notify,index),daemon=True,name='ZDesk camera')
     worker.start()
     return worker

@@ -33,6 +33,11 @@ function fixture(){
  assert.equal(keyName({key:'!',code:'Digit1'}),'1');assert.equal(keyName({key:'A',code:'KeyA'}),'a');assert.equal(keyName({key:'ArrowLeft'}),'left');
  const f=fixture();f.listeners.keydown({key:'Control',preventDefault(){}});f.listeners.keydown({key:'c',code:'KeyC',preventDefault(){}});f.listeners.blur();assert.equal(f.sent.at(-1).type,'release');assert.equal(f.control.keys.size,0);
 }
+{
+ const f=fixture();f.control.setMode('trackpad');f.control.down(f.e(1,30,40));f.control.move(f.e(1,31,41));assert.equal(f.sent.length,0,'Small touch jitter should not move the pointer');
+ f.control.points.get(1).time-=600;f.control.move(f.e(1,70,50));f.control.up(f.e(1,70,50));
+ assert.deepEqual(f.sent.map(v=>v.type),['pointer_down','move','pointer_up'],'Hold then move drags in trackpad mode');
+}
 function wave(){const b=Buffer.alloc(44+4800*4);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(2,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(96000,28);b.writeUInt16LE(4,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);for(let i=0;i<4800;i++){const v=Math.round(Math.sin(i/24000*2*Math.PI*440)*10000);b.writeInt16LE(v,44+i*4);b.writeInt16LE(v,46+i*4)}return b}
 (async()=>{
  const bytes=wave(),pcm=pcmWave(bytes);assert.equal(pcm.frames,4800);assert(pcm.peak>.3);assert.throws(()=>pcmWave(bytes.subarray(0,60)));

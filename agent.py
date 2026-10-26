@@ -21,7 +21,7 @@ class Companion:
             saved=local_settings.load()
             if saved:
                 self.credentials=saved;self.url.set(saved['url']);self.unattended.set(True);self.background.set(bool(saved.get('background',False)))
-                for key,var,event in [('control',self.control,self.allow),('audio',self.system_audio,self.audio),('microphone',self.microphone,self.mic),('files',self.file_permission,self.files)]:
+                for key,var,event in [('control',self.control,self.allow),('audio',self.system_audio,self.audio),('microphone',self.microphone,self.mic),('files',self.file_permission,self.files),('camera',self.camera_permission,self.camera)]:
                     var.set(bool(saved.get(key)));self.permission(var,event,False)
                 root.after(500,self.connect)
         except Exception as e:self.status.set('Could not load enrollment: '+str(e))
@@ -34,7 +34,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='ZDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.4',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text='WINDOWS COMPANION  /  3.5',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -58,14 +58,12 @@ class Companion:
         for label,var,secret in [('Server address',self.url,False),('Pairing code or connection passcode',self.code,True)]:
             tk.Label(f,text=label,bg=panel,fg=muted,font=('Segoe UI',9)).pack(anchor='w',pady=(4,4))
             tk.Entry(f,textvariable=var,show='•' if secret else '',bg='#0d1829',fg=ink,insertbackground=mint,relief='flat',highlightthickness=1,highlightbackground='#344964',highlightcolor=mint,font=('Segoe UI',11)).pack(fill='x',ipady=8,pady=(0,5))
-        self.camera_permission=tk.BooleanVar();self.camera_status=tk.StringVar(value="Camera off · enable locally each session");self.camera_index=tk.StringVar(value="0");self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.microphone=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar();self.background=tk.BooleanVar()
+        self.camera_permission=tk.BooleanVar();self.camera_status=tk.StringVar(value="Camera off · automatically selects an available camera");self.control=tk.BooleanVar();self.system_audio=tk.BooleanVar();self.microphone=tk.BooleanVar();self.file_permission=tk.BooleanVar();self.unattended=tk.BooleanVar();self.background=tk.BooleanVar()
         f=card('02  Choose what to share','Permissions apply only to this computer. You can disconnect at any time.')
         for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · PC sounds',self.system_audio,self.audio),('Microphone · surrounding sound',self.microphone,self.mic),('Files in ZDesk Shared and Inbox folders',self.file_permission,self.files)]:
             ttk.Checkbutton(f,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e)).pack(anchor='w')
-        ttk.Checkbutton(f,text='Camera · share surroundings (not remembered)',variable=self.camera_permission,command=self.camera_changed).pack(anchor='w')
+        ttk.Checkbutton(f,text='Camera · share surroundings (saved with remembered pairing)',variable=self.camera_permission,command=self.camera_changed).pack(anchor='w')
         camera_row=tk.Frame(f,bg=panel);camera_row.pack(fill='x',pady=5)
-        tk.Label(camera_row,text='Camera index',bg=panel,fg=muted).pack(side='left')
-        ttk.Combobox(camera_row,textvariable=self.camera_index,values=['0','1','2','3'],state='readonly',width=4).pack(side='left',padx=8)
         button(camera_row,'Stop camera',self.stop_camera).pack(side='left')
         tk.Label(f,textvariable=self.camera_status,bg=panel,fg=mint,wraplength=580,justify='left').pack(anchor='w')
         ttk.Checkbutton(f,text='Remember this computer and reconnect automatically',variable=self.unattended,command=self.remember_changed).pack(anchor='w')
@@ -88,13 +86,14 @@ class Companion:
         tk.Label(footer,text='Available after Windows sign-in while the PC is awake. Lock screen and UAC are not supported.',bg=panel,fg=muted,wraplength=650,font=('Segoe UI',8)).pack(anchor='w',pady=(10,0))
     def camera_changed(self):
         if self.camera_permission.get():
-            if not messagebox.askokcancel('Share camera and surroundings?', 'The paired dashboard can see this camera and its surroundings. ZDesk stays visible as a window or tray icon. Use Stop camera or Disconnect to stop. This permission is not saved for future sessions.'):
+            if not messagebox.askokcancel('Share camera and surroundings?', 'The paired dashboard can see this camera and its surroundings. ZDesk stays visible as a window or tray icon. Use Stop camera or Disconnect to stop. With Remember this computer enabled, this camera choice is saved and camera sharing resumes when ZDesk reconnects, including at Windows sign-in if enabled. Stop camera turns off the saved camera choice.'):
                 self.camera_permission.set(False);return
-            self.camera.set();self.camera_status.set('Camera selected · sharing starts when connected')
+            self.camera.set();self.camera_status.set('Camera selected · automatic camera detection when connected');self.save()
         else:self.stop_camera()
     def stop_camera(self):
         self.camera.clear();self.camera_permission.set(False);self.camera_status.set('Camera off')
         if self.tray:self.tray.title='ZDesk — remote access companion'
+        self.save()
     def background_changed(self):
         if self.background.get():
             if not messagebox.askokcancel('Keep remote access available?', 'Closing the window will leave ZDesk running with a visible tray icon and your selected sharing permissions. Use Disconnect or Quit ZDesk from the tray to stop access.'):
@@ -121,7 +120,7 @@ class Companion:
     def show(self):
         self.root.deiconify();self.root.lift();self.root.focus_force()
     def config(self):
-        return {**self.credentials,'control':self.control.get(),'audio':self.system_audio.get(),'microphone':self.microphone.get(),'files':self.file_permission.get(),'background':self.background.get()}
+        return {**self.credentials,'control':self.control.get(),'audio':self.system_audio.get(),'microphone':self.microphone.get(),'files':self.file_permission.get(),'camera':self.camera_permission.get(),'background':self.background.get()}
     def save(self):
         if self.credentials and self.unattended.get():
             try:local_settings.save(self.config())
@@ -134,7 +133,7 @@ class Companion:
         if persist:self.save()
     def remember_changed(self):
         if self.unattended.get():
-            if not messagebox.askokcancel('Enable unattended reconnect?', 'This Windows user will reconnect and share the screen automatically when ZDesk starts. Enabled control, audio and file permissions will also be remembered. ZDesk remains visible as a window or tray icon; Disconnect stops this session.'):self.unattended.set(False);return
+            if not messagebox.askokcancel('Enable unattended reconnect?', 'This Windows user will reconnect and share the screen automatically when ZDesk starts. Enabled control, audio, camera and file permissions will also be remembered. Camera sharing will resume automatically with a visible window or tray indicator. ZDesk remains visible as a window or tray icon; Disconnect stops this session.'):self.unattended.set(False);return
             self.save()
         else:local_settings.forget()
     def poll(self):
@@ -145,8 +144,12 @@ class Companion:
                     self.camera_status.set(text)
                     if self.tray:self.tray.title='ZDesk — camera ON' if self.camera.is_set() else 'ZDesk — remote access companion'
                     continue
-                if kind=='camera_done':self.stop_camera();continue
-                if kind=='camera_error':self.stop_camera();self.camera_status.set('Camera error: '+text);continue
+                if kind=='camera_done':
+                    self.camera_status.set('Camera stopped · saved selection applies on next Connect');continue
+                if kind=='camera_error':
+                    self.camera.clear();self.camera_status.set('Camera error: '+text)
+                    if self.tray:self.tray.title='ZDesk — remote access companion'
+                    continue
                 if kind=='action':getattr(self,text)();continue
                 if kind=='control_error':self.control.set(False);self.save()
                 if kind=='tray_error':self.background.set(False);self.tray=None;self.tray_ready.clear();self.show();self.save()
@@ -173,6 +176,7 @@ class Companion:
         saved=self.credentials if not code and self.credentials and self.credentials['url']==url else None
         if not saved and not code:messagebox.showerror('Pairing','Paste a dashboard pairing code or your reusable connection passcode.');return
         if not (saved and self.unattended.get()) and not messagebox.askokcancel('Start screen sharing?', 'The dashboard owner can see your primary display. Only the checked permissions are enabled.'):return
+        if self.camera_permission.get():self.camera.set()
         self.control_failure=None;self.stop=threading.Event();self.start.config(state='disabled');self.running=True
         threading.Thread(target=self.run,args=(url,code,saved,self.unattended.get()),daemon=True).start()
     def run(self,url,code,saved,retry):
@@ -199,7 +203,7 @@ class Companion:
                     r.raise_for_status()
                     if self.camera.is_set() and (camera_thread is None or not camera_thread.is_alive()):
                         from camera_capture import start as start_camera
-                        camera_thread=start_camera(base,credentials['token'],stop,self.camera,self.events.put,int(self.camera_index.get()))
+                        camera_thread=start_camera(base,credentials['token'],stop,self.camera,self.events.put)
                     if (self.audio.is_set() or self.mic.is_set()) and (audio_thread is None or not audio_thread.is_alive()):
                         audio_thread=start_audio(url,identity,credentials['token'],stop,self.audio,self.events.put,microphone=self.mic)
                     if self.files.is_set() and (file_thread is None or not file_thread.is_alive()):
@@ -215,7 +219,7 @@ class Companion:
         finally:
             stop.set()
             self.camera.clear()
-            self.events.put(('camera_done','Camera off. Enable locally for a new session.'))
+            self.events.put(('camera_done','Camera stopped'))
             if camera_thread:camera_thread.join(timeout=2)
             if input_thread:input_thread.join(timeout=2)
             if audio_thread:audio_thread.join(timeout=2)
@@ -285,7 +289,7 @@ class Companion:
     def enable_startup(self):
         if not self.credentials or not self.unattended.get():
             messagebox.showerror('Pair first','Pair once and enable Remember this computer first.');return
-        if not messagebox.askokcancel('Start at Windows sign-in?', 'ZDesk will open and reconnect using your remembered screen/control/audio/file permissions whenever this Windows user signs in.'):return
+        if not messagebox.askokcancel('Start at Windows sign-in?', 'ZDesk will open and reconnect using your remembered screen/control/audio/camera/file permissions whenever this Windows user signs in.'):return
         try:
             import native_shell
             native_shell.startup(True);self.status.set('Windows sign-in startup enabled. The app remains visible.')
@@ -295,7 +299,9 @@ class Companion:
             import native_shell
             native_shell.startup(False);self.status.set('Windows sign-in startup disabled.')
         except Exception as e:messagebox.showerror('Startup',str(e))
-    def disconnect(self):self.stop_camera();self.stop.set();self.status.set('Disconnecting…')
+    def disconnect(self):
+        self.camera.clear();self.stop.set();self.camera_status.set('Camera stopped · Connect resumes selected permissions');self.status.set('Disconnecting…')
+        if self.tray:self.tray.title='ZDesk — remote access companion'
     def forget(self):
         self.disconnect();local_settings.forget();self.credentials=None;self.unattended.set(False)
         self.status.set('Enrollment forgotten. Also Revoke the device in your dashboard.')

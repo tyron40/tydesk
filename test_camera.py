@@ -49,6 +49,20 @@ class CameraTests(unittest.TestCase):
    camera_capture.run(self.base,'test-token',stop,allowed,Mock())
   capture.release.assert_called_once();session.post.assert_called_once()
 
+ def test_automatic_selection_skips_unusable_devices_and_releases_them(self):
+  allowed=threading.Event();allowed.set();stop=threading.Event()
+  missing=Mock();missing.isOpened.return_value=False
+  black=Mock();black.isOpened.return_value=True;black.read.return_value=(False,None)
+  working=Mock();working.isOpened.return_value=True;frame=object();working.read.return_value=(True,frame)
+  cv=Mock();cv.CAP_DSHOW=700;cv.CAP_MSMF=1400;cv.VideoCapture.side_effect=[missing,black,working]
+  capture,image=camera_capture.open_camera(cv,stop,allowed)
+  self.assertIs(capture,working);self.assertIs(image,frame)
+  self.assertEqual([c.args for c in cv.VideoCapture.call_args_list],[(0,700),(0,1400),(1,700)])
+  missing.release.assert_called_once();black.release.assert_called_once();working.release.assert_not_called()
+ def test_auto_selection_never_opens_camera_without_local_permission(self):
+  cv=Mock();capture,frame=camera_capture.open_camera(cv,threading.Event(),threading.Event())
+  self.assertIsNone(capture);cv.VideoCapture.assert_not_called()
+
  def test_stopping_camera_releases_hardware_during_a_slow_upload(self):
   allowed=threading.Event();allowed.set();stop=threading.Event();uploading=threading.Event();finish=threading.Event();released=threading.Event()
   capture=Mock();capture.isOpened.return_value=True;capture.release.side_effect=released.set

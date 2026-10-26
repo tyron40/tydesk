@@ -41,6 +41,8 @@ class Controls{
   if(!this.advanced())return;
   const distance=Math.hypot(e.clientX-old.startX,e.clientY-old.startY);
   if(old.touch&&this.mode==='trackpad'){
+   if(distance<4)return;
+   if(!old.moved){old.moved=true;old.trackDrag=Date.now()-old.time>500;if(old.trackDrag){this.drag=true;this.emit({type:'pointer_down',...this.cur,button:'left'})}}
    const r=this.el.getBoundingClientRect();this.locate({x:clamp(this.cur.x+dx/r.width*1.4),y:clamp(this.cur.y+dy/r.height*1.4)});this.emit({type:'move',...this.cur});return;
   }
   if(old.touch&&!this.drag&&distance>7){this.drag=true;this.emit({type:'pointer_down',...old.start,button:'left'})}
