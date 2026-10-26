@@ -28,6 +28,7 @@ def main():
  else:executable=folder/'ZDesk'
  subprocess.run([str(executable),'--desktop-self-test',str(ROOT/'desktop-smoke.json')],check=True,timeout=90)
  report=json.loads((ROOT/'desktop-smoke.json').read_text());assert report['ok'];assert report['architecture'].lower() in (('arm64','aarch64') if actual=='arm64' else ('x86_64','amd64'))
+ output.unlink(missing_ok=True)
  if sys.platform=='darwin':
   subprocess.run(['ditto','-c','-k','--sequesterRsrc','--keepParent',str(bundle),str(output)],check=True)
  else:

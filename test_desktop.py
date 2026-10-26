@@ -28,8 +28,12 @@ class DesktopTests(unittest.TestCase):
    controller.apply({'type':'key_down','key':'win'});controller.release()
   pg.keyDown.assert_called_with('command');pg.keyUp.assert_called_with('command');self.assertFalse(controller.keys)
  def test_nonwindows_pairing_uses_secure_backend_for_save_load_and_forget(self):
-  with patch('local_settings.os.name','posix'),patch('desktop_runtime.secure_save') as save,patch('desktop_runtime.secure_load',return_value='{"id":"one","camera":true}') as load,patch('desktop_runtime.secure_forget') as forget:
+  with tempfile.TemporaryDirectory() as folder,patch('local_settings.ROOT',Path(folder)),patch('local_settings.os.name','posix'),patch('desktop_runtime.secure_save') as save,patch('desktop_runtime.secure_load',return_value='{"id":"one","camera":true}') as load,patch('desktop_runtime.secure_forget') as forget:
    local_settings.save({'id':'one','camera':True});self.assertEqual(json.loads(save.call_args.args[0]),{'id':'one','camera':True});self.assertTrue(local_settings.load()['camera']);local_settings.forget();forget.assert_called_once()
+ def test_forget_blocks_restore_even_when_os_keyring_is_locked(self):
+  with tempfile.TemporaryDirectory() as folder,patch('local_settings.ROOT',Path(folder)),patch('local_settings.os.name','posix'),patch('desktop_runtime.secure_forget',side_effect=RuntimeError('locked')),patch('desktop_runtime.secure_load',return_value='{"id":"old"}') as load,patch('desktop_runtime.secure_save') as save:
+   local_settings.forget();self.assertIsNone(local_settings.load());load.assert_not_called()
+   local_settings.save({'id':'new'});self.assertFalse((Path(folder)/'enrollment-forgotten').exists());save.assert_called_once()
  def test_startup_is_opt_in_user_scoped_and_removable(self):
   with tempfile.TemporaryDirectory() as folder,patch('desktop_shell.Path.home',return_value=Path(folder)),patch('desktop_shell.sys.platform','darwin'):
    path=Path(folder)/'Library/LaunchAgents/com.zdesk.companion.plist'
