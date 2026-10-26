@@ -1,7 +1,7 @@
 {
-  "sha256": "c1e4a16f85e1b12711d4fdec479e66592c034ef3a581a3c2584657b3b354947f",
-  "unsigned": true,
-  "version": "3.6",
   "architecture": "windows-x64",
-  "source_commit": "2ee597e0f57b453337bea40aef53354fde30845c"
+  "sha256": "a68c11f7904da1b45eecbac26bad3cf9be68241758ffb88f065d01c305cd8186",
+  "version": "3.7",
+  "unsigned": true,
+  "source_commit": "8889fc5181d1d3ea16748280244dedce873b97d1"
 }
