@@ -37,10 +37,10 @@ jobs:
             filename: ZDesk-macOS-Apple-Silicon.zip
           - target: linux-x64
             runner: ubuntu-22.04
-            filename: ZDesk-Linux-x64.tar.gz
+            filename: ZDesk-Linux-x64.tar.xz
           - target: linux-arm64
             runner: ubuntu-22.04-arm
-            filename: ZDesk-Linux-ARM64.tar.gz
+            filename: ZDesk-Linux-ARM64.tar.xz
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     steps:
@@ -87,7 +87,7 @@ jobs:
           cp native-bundles/*-build.json downloads/
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add downloads/ZDesk-macOS-*.zip downloads/ZDesk-Linux-*.tar.gz downloads/macos-*-build.json downloads/linux-*-build.json
+          git add downloads/ZDesk-macOS-*.zip downloads/ZDesk-Linux-*.tar.xz downloads/macos-*-build.json downloads/linux-*-build.json
           git commit -m 'Publish checked Mac and Linux companion downloads'
           git pull --rebase origin main
           git push origin HEAD:main

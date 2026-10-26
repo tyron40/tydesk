@@ -32,7 +32,8 @@ def main():
   subprocess.run(['ditto','-c','-k','--sequesterRsrc','--keepParent',str(bundle),str(output)],check=True)
  else:
   (folder/'READ-ME.txt').write_text('ZDesk '+VERSION+'\n\n'+entry['requirements']+'\n\n'+entry['setup']+'\n\nOpen ZDesk, enter your dashboard connection passcode, select local sharing permissions, and Connect. Camera/microphone remain visibly indicated. Disconnect or Quit stops sharing.\n')
-  with tarfile.open(output,'w:gz') as tar:tar.add(folder,arcname='ZDesk')
+  with tarfile.open(output,'w:xz',preset=9) as tar:tar.add(folder,arcname='ZDesk')
+ print('Packaged payload largest files:',[(p.name,p.stat().st_size) for p in sorted(folder.rglob('*'),key=lambda p:p.stat().st_size if p.is_file() else 0,reverse=True)[:12] if p.is_file()])
  assert output.stat().st_size<95*1024*1024,'Bundle exceeds direct-download distribution limit'
  manifest={'version':VERSION,'source_commit':os.environ.get('GITHUB_SHA','local'),'architecture':entry['architecture'],'platform':entry['os'],'sha256':hashlib.sha256(output.read_bytes()).hexdigest(),'development_build':True,'notarized':False,'hardware_tested':False,'packaged_smoke':report}
  (output.parent/(target+'-build.json')).write_text(json.dumps(manifest,indent=2))
