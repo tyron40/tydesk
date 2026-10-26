@@ -1,0 +1,18 @@
+{
+  "version": "3.7",
+  "source_commit": "80273585c6659f13f5499f38a4920fd395221225",
+  "architecture": "arm64",
+  "platform": "macos",
+  "sha256": "16f407a52a5351094e4531de12a6f98abc66e539ea3d23e590aa3e7b3145e473",
+  "development_build": true,
+  "notarized": false,
+  "hardware_tested": false,
+  "packaged_smoke": {
+    "ok": true,
+    "platform": "macos",
+    "architecture": "arm64",
+    "ui": true,
+    "camera_module": "4.11.0",
+    "no_capture_permissions_requested": true
+  }
+}

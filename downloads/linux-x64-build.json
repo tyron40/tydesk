@@ -1,0 +1,18 @@
+{
+  "version": "3.7",
+  "source_commit": "80273585c6659f13f5499f38a4920fd395221225",
+  "architecture": "x64",
+  "platform": "linux",
+  "sha256": "0c83c4f8d936c832a2e6befaf4877643e788337a465b2ed149474dc44ae1e0ad",
+  "development_build": true,
+  "notarized": false,
+  "hardware_tested": false,
+  "packaged_smoke": {
+    "ok": true,
+    "platform": "linux",
+    "architecture": "x86_64",
+    "ui": true,
+    "camera_module": "4.11.0",
+    "no_capture_permissions_requested": true
+  }
+}
