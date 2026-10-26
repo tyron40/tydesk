@@ -172,3 +172,9 @@ The branded address is a free gateway to the original authoritative broker. Exis
 ### Remove a companion
 
 Update the native companion, connect with local control enabled, then select **Uninstall companion** on the device card or session toolbar. Android requests confirmation in the visible app and its system uninstaller. Windows confirms before disabling startup, removing desktop shortcuts and saved enrollment, then recycling the running portable EXE after exit. It preserves shared and received PC files. Revoke the dashboard pairing after verifying removal; revocation alone does not uninstall software. Offline devices and browser companions cannot be uninstalled from the dashboard.
+
+### Camera sharing (Windows 3.4 / Android 1.2)
+
+ZDesk stays visibly named as a remote-access companion. Enable Camera on the device for the current sharing session, then use Open camera view in the dashboard session. The viewer cannot activate a camera. Camera permission is never restored from remembered pairing. Windows supports camera indexes 0–3; use Stop camera or Disconnect. Android offers front/rear selection, an OS camera permission prompt, a foreground camera notification and Stop camera / Stop sharing; notifications are required for camera sharing on Android 13+. Android camera sharing must start from the visible app.
+
+Camera JPEG frames are kept only as a current in-memory frame, require the device token to upload and dashboard authentication to view, expire after eight seconds, and are cleared when permission is disabled or the device disconnects. No camera recording is implemented. Some protected camera hardware, privacy switches or another app owning the camera can prevent capture. Build and mock transport checks do not substitute for testing on actual devices.

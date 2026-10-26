@@ -24,7 +24,7 @@ def audit(identity, event):
     db.commit()
 def fresh(token, name):
     return dict(token=token, name=name, seen=0, frame=b'', commands=deque(maxlen=50), control=False,
-        audio=False, files=False, audio_chunks=deque(maxlen=8), audio_seq=0, share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
+        camera=False, camera_frame=b'', camera_seen=0, audio=False, files=False, audio_chunks=deque(maxlen=8), audio_seq=0, share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
 if device_registry.ENABLED:
     # Durable registry is authoritative. Never resurrect locally cached revocations.
     rows=device_registry.list_devices()
@@ -148,7 +148,7 @@ def enroll():
 def listing():
     with lock:
         return jsonify([dict(id=k, name=d['name'], online=time.time()-d['seen'] < 8,
-            control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol'],
+            camera=d.get('camera',False), control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol'],
             platform=d.get('platform','unknown'), removal_supported=d.get('removal_supported',False),
             removal_state=('expired' if d.get('removal',{}).get('state') in ('pending','confirmation_required') and time.time()>d['removal']['expires']+(120 if d['removal']['state']=='confirmation_required' else 0) else d.get('removal',{}).get('state'))) for k,d in devices.items()])
 
@@ -167,6 +167,8 @@ def frame_upload(identity):
         platform=request.headers.get('X-Companion-Platform','unknown')
         d['platform']=platform if platform in ('windows','android') else 'unknown'
         d['removal_supported']=d['platform']!='unknown' and request.headers.get('X-Companion-Removal')=='1'
+        d['camera'] = request.headers.get('X-Allow-Camera') == 'yes'
+        if not d['camera']:d['camera_frame']=b'';d['camera_seen']=0
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'
         d['files'] = request.headers.get('X-Allow-Files') == 'yes'
         if not d['audio']: d['audio_chunks'].clear()
@@ -222,6 +224,8 @@ def revoke(identity):
 
 from extensions import install
 purge_transfers = install(app, admin, device, devices, lock, DATA, audit)
+from camera_routes import install as install_camera
+install_camera(app, admin, device, devices, lock)
 from companion_removal import install as install_removal
 install_removal(app, admin, device, devices, lock, audit)
 

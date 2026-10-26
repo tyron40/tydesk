@@ -196,7 +196,7 @@ def install(app, admin, device, devices, lock, data_dir, audit):
     @app.post('/api/devices/<identity>/disconnect')
     def disconnect(identity):
         with lock:
-            d=device(identity);d.update(seen=0,frame=b'',control=False,audio=False,files=False)
+            d=device(identity);d.update(seen=0,frame=b'',control=False,audio=False,files=False,camera=False,camera_frame=b'',camera_seen=0)
             d['commands'].clear();d['audio_chunks'].clear();purge(identity)
             audit(identity,'disconnected')
         return '',204

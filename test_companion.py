@@ -9,7 +9,7 @@ class CompanionTests(unittest.TestCase):
   a.credentials={'id':'old','token':'old-token','url':'https://example.test'}
   a.url=Mock();a.url.get.return_value='https://example.test';a.code=Mock();a.code.get.return_value=''
   a.unattended=Mock();a.unattended.get.return_value=True;a.background=Mock();a.background.get.return_value=True
-  a.start=Mock();a.status=Mock();a.stop=threading.Event();a.events=queue.Queue();a.allow=threading.Event();a.audio=threading.Event();a.files=threading.Event()
+  a.start=Mock();a.status=Mock();a.stop=threading.Event();a.events=queue.Queue();a.allow=threading.Event();a.audio=threading.Event();a.files=threading.Event();a.camera=threading.Event();a.camera_permission=Mock();a.camera_status=Mock();a.tray=None
   return a
  def test_new_code_overrides_stale_saved_enrollment(self):
   a=self.app();a.code.get.return_value='fresh-pairing-code'
