@@ -49,4 +49,18 @@ class CameraTests(unittest.TestCase):
    camera_capture.run(self.base,'test-token',stop,allowed,Mock())
   capture.release.assert_called_once();session.post.assert_called_once()
 
+ def test_stopping_camera_releases_hardware_during_a_slow_upload(self):
+  allowed=threading.Event();allowed.set();stop=threading.Event();uploading=threading.Event();finish=threading.Event();released=threading.Event()
+  capture=Mock();capture.isOpened.return_value=True;capture.release.side_effect=released.set
+  frame=Mock();frame.shape=(480,640,3);capture.read.return_value=(True,frame)
+  cv=Mock();cv.VideoCapture.return_value=capture;cv.imencode.return_value=(True,Mock(tobytes=lambda:self.jpeg))
+  session=Mock();session.headers={};session.__enter__=lambda s:s;session.__exit__=lambda *a:None
+  def upload(*args,**kwargs):uploading.set();finish.wait(3);return Mock(status_code=204)
+  session.post.side_effect=upload
+  with patch.dict(sys.modules,{'cv2':cv}),patch('camera_capture.requests.Session',return_value=session):
+   worker=threading.Thread(target=camera_capture.run,args=(self.base,'test-token',stop,allowed,Mock()))
+   worker.start();self.assertTrue(uploading.wait(1));allowed.clear()
+   try:self.assertTrue(released.wait(1),'Camera must release without waiting for the upload')
+   finally:finish.set();worker.join(2)
+
 if __name__=='__main__':unittest.main()
