@@ -9,6 +9,8 @@ on:
       - native_shell.py
       - local_settings.py
       - camera_capture.py
+      - desktop_runtime.py
+      - desktop_shell.py
       - audio_capture.py
       - file_exchange.py
       - extensions.py
@@ -56,7 +58,7 @@ jobs:
           New-Item -ItemType Directory -Force downloads | Out-Null
           Copy-Item dist/ZDesk.exe downloads/ZDesk.exe -Force
           $hash = (Get-FileHash downloads/ZDesk.exe -Algorithm SHA256).Hash.ToLower()
-          @{ sha256 = $hash; source_commit = (git rev-parse HEAD); architecture = 'windows-x64'; version = '3.6'; unsigned = $true } | ConvertTo-Json | Set-Content downloads/windows-build.json
+          @{ sha256 = $hash; source_commit = (git rev-parse HEAD); architecture = 'windows-x64'; version = '3.7'; unsigned = $true } | ConvertTo-Json | Set-Content downloads/windows-build.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm --ignore-unmatch downloads/TyDesk.exe

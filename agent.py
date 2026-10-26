@@ -1,28 +1,29 @@
-"""Visible Windows companion with opt-in saved enrollment and sign-in startup."""
+"""Visible desktop companion with opt-in saved enrollment and sign-in startup."""
 import io,platform,threading,time,queue,tkinter as tk,sys,json,tempfile
 from pathlib import Path
 from tkinter import messagebox, ttk
 from urllib.parse import urlparse
 import requests
 import pyautogui as pg
+import desktop_runtime
 import local_settings
 import remote_input
 pg.FAILSAFE=True
 pg.PAUSE=0
 
 class Companion:
-    def __init__(self,root):
+    def __init__(self,root,restore=True):
         self.root=root;self.stop=threading.Event();self.allow=threading.Event();self.audio=threading.Event();self.mic=threading.Event();self.files=threading.Event();self.camera=threading.Event()
         self.events=queue.Queue();self.credentials=None;self.running=False
         self.tray=None;self.tray_ready=threading.Event();self.exiting=False
         self.build_ui(root)
         root.protocol('WM_DELETE_WINDOW',self.close);root.after(100,self.poll)
         try:
-            saved=local_settings.load()
+            saved=local_settings.load() if restore else None
             if saved:
                 self.credentials=saved;self.url.set(saved['url']);self.unattended.set(True);self.background.set(bool(saved.get('background',False)))
                 for key,var,event in [('control',self.control,self.allow),('audio',self.system_audio,self.audio),('microphone',self.microphone,self.mic),('files',self.file_permission,self.files),('camera',self.camera_permission,self.camera)]:
-                    var.set(bool(saved.get(key)));self.permission(var,event,False)
+                    var.set(bool(saved.get(key)) and (key!='audio' or desktop_runtime.system_audio_available()));self.permission(var,event,False)
                 root.after(500,self.connect)
         except Exception as e:self.status.set('Could not load enrollment: '+str(e))
     def build_ui(self,root):
@@ -34,7 +35,7 @@ class Companion:
         style.map('TCheckbutton',background=[('active',panel)],indicatorbackground=[('selected',mint)])
         header=tk.Frame(root,bg=bg);header.pack(fill='x',padx=30,pady=(24,14))
         tk.Label(header,text='ZDesk',bg=bg,fg=ink,font=('Segoe UI',30,'bold')).pack(side='left')
-        tk.Label(header,text='WINDOWS COMPANION  /  3.6',bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
+        tk.Label(header,text=desktop_runtime.label()+' COMPANION  /  '+desktop_runtime.VERSION,bg=bg,fg=mint,font=('Segoe UI',9,'bold')).pack(side='right')
         tk.Label(root,text='Your computer. Within reach.',bg=bg,fg=ink,font=('Segoe UI',18,'bold')).pack(anchor='w',padx=30)
         tk.Label(root,text='Connect once, then return from your device dashboard.',bg=bg,fg=muted).pack(anchor='w',padx=30,pady=(4,14))
         # Scroll the settings on smaller screens; connection controls stay accessible.
@@ -65,14 +66,15 @@ class Companion:
         button(choices,'Clear selections',lambda:self.select_all_sharing(False)).pack(side='left')
         tk.Label(f,text='Connect shares your primary display and checked features with the paired dashboard. Camera shows surroundings; microphone shares nearby conversations. Select all chooses these permissions without starting a disconnected session. Changes apply immediately while connected. Stop camera or Clear selections stops optional sharing; Disconnect or Quit also stops the screen.',bg=panel,fg=muted,wraplength=580,justify='left').pack(anchor='w',pady=(0,8))
         for text,var,event in [('Mouse and keyboard control',self.control,self.allow),('System playback audio · PC sounds',self.system_audio,self.audio),('Microphone · surrounding sound',self.microphone,self.mic),('Files in ZDesk Shared and Inbox folders',self.file_permission,self.files)]:
-            ttk.Checkbutton(f,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e)).pack(anchor='w')
+            item=ttk.Checkbutton(f,text=text,variable=var,command=lambda v=var,e=event:self.permission(v,e));item.pack(anchor='w')
+            if var is self.system_audio and not desktop_runtime.system_audio_available():item.configure(state='disabled')
         ttk.Checkbutton(f,text='Camera · share surroundings (saved with remembered pairing)',variable=self.camera_permission,command=self.camera_changed).pack(anchor='w')
         camera_row=tk.Frame(f,bg=panel);camera_row.pack(fill='x',pady=5)
         button(camera_row,'Stop camera',self.stop_camera).pack(side='left')
         tk.Label(f,textvariable=self.camera_status,bg=panel,fg=mint,wraplength=580,justify='left').pack(anchor='w')
         ttk.Checkbutton(f,text='Remember this computer and reconnect automatically',variable=self.unattended,command=self.remember_changed).pack(anchor='w')
         ttk.Checkbutton(f,text='Keep available in the tray when I close this window',variable=self.background,command=self.background_changed).pack(anchor='w')
-        tk.Label(f,text='Remember saves all checked permissions, including camera and microphone, for automatic reconnect. Tray mode keeps selected sharing running after closing the window, with a visible tray indicator. Enable sign-in start also reconnects when this Windows user signs in.',bg=panel,fg=muted,wraplength=580,justify='left').pack(anchor='w',pady=(6,0))
+        tk.Label(f,text='Remember saves all checked permissions, including camera and microphone, for automatic reconnect. Tray mode keeps selected sharing running after closing the window, with a visible tray indicator. Enable sign-in start also reconnects when this user signs in.',bg=panel,fg=muted,wraplength=580,justify='left').pack(anchor='w',pady=(6,0))
         f=card('03  Make it easy to return','Tray menu: Open ZDesk, Connect, Disconnect, or Quit ZDesk.')
         row=tk.Frame(f,bg=panel);row.pack(fill='x')
         button(row,'Desktop shortcut',self.shortcut).pack(side='left',padx=(0,8))
@@ -88,9 +90,9 @@ class Companion:
         self.start=button(row,'Connect computer',self.connect,True);self.start.pack(side='left',padx=(0,10))
         button(row,'Disconnect',self.disconnect).pack(side='left')
         button(row,'Quit ZDesk',self.quit).pack(side='right')
-        tk.Label(footer,text='Available after Windows sign-in while the PC is awake. Lock screen and UAC are not supported.',bg=panel,fg=muted,wraplength=650,font=('Segoe UI',8)).pack(anchor='w',pady=(10,0))
+        tk.Label(footer,text=desktop_runtime.guidance(),bg=panel,fg=muted,wraplength=650,font=('Segoe UI',8)).pack(anchor='w',pady=(10,0))
     def sharing_options(self):
-        return [(self.control,self.allow),(self.system_audio,self.audio),(self.microphone,self.mic),(self.file_permission,self.files),(self.camera_permission,self.camera)]
+        return [(self.control,self.allow)]+([(self.system_audio,self.audio)] if desktop_runtime.system_audio_available() else [])+[(self.microphone,self.mic),(self.file_permission,self.files),(self.camera_permission,self.camera)]
     def select_all_sharing(self,enabled=True):
         for var,event in self.sharing_options():
             var.set(enabled);event.set() if enabled else event.clear()
@@ -123,7 +125,8 @@ class Companion:
             def run():
                 try:self.tray.run(setup)
                 except Exception:self.events.put(('tray_error','Tray could not start. The window will remain open.'))
-            threading.Thread(target=run,daemon=True).start()
+            if sys.platform=='darwin':self.tray.run_detached(setup)
+            else:threading.Thread(target=run,daemon=True).start()
         except Exception as e:self.events.put(('tray_error','Tray unavailable: '+str(e)))
     def show(self):
         self.root.deiconify();self.root.lift();self.root.focus_force()
@@ -198,9 +201,9 @@ class Companion:
             self.events.put(('status','Sharing primary display • Disconnect to stop'))
             while not stop.is_set():
                 try:
-                    shot=pg.screenshot();shot.thumbnail((1600,1000));buf=io.BytesIO();shot.convert('RGB').save(buf,'JPEG',quality=65)
+                    shot=desktop_runtime.screenshot(pg);shot.thumbnail((1600,1000));buf=io.BytesIO();shot.convert('RGB').save(buf,'JPEG',quality=65)
                     if stop.is_set():break
-                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Camera':'yes' if self.camera.is_set() else 'no','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape(),'X-Companion-Platform':'windows','X-Companion-Removal':'1' if getattr(sys,'frozen',False) else '0'},timeout=8)
+                    r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Camera':'yes' if self.camera.is_set() else 'no','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape(),'X-Companion-Platform':desktop_runtime.platform_id(),'X-Companion-Removal':'1' if sys.platform=='win32' and getattr(sys,'frozen',False) else '0'},timeout=8)
                     if r.status_code==401:raise PermissionError('Saved connection no longer exists. Paste a new pairing code or your reusable passcode, then Connect.')
                     r.raise_for_status()
                     if self.camera.is_set() and (camera_thread is None or not camera_thread.is_alive()):
@@ -293,12 +296,12 @@ class Companion:
             messagebox.showerror('Pair first','Pair once and enable Remember this computer first.');return
         try:
             import native_shell
-            native_shell.startup(True);self.status.set('Windows sign-in startup enabled. The app remains visible.')
+            native_shell.startup(True);self.status.set('Sign-in startup enabled. The app remains visible.')
         except Exception as e:messagebox.showerror('Startup',str(e))
     def disable_startup(self):
         try:
             import native_shell
-            native_shell.startup(False);self.status.set('Windows sign-in startup disabled.')
+            native_shell.startup(False);self.status.set('Sign-in startup disabled.')
         except Exception as e:messagebox.showerror('Startup',str(e))
     def disconnect(self):
         self.camera.clear();self.stop.set();self.camera_status.set('Camera stopped · Connect resumes selected permissions');self.status.set('Disconnecting…')
@@ -312,8 +315,6 @@ class Companion:
             if not self.tray_ready.is_set():
                 self.status.set('Starting the tray icon. Please close the window again in a moment.');return
             self.save();self.tray.title='ZDesk — camera ON' if self.camera.is_set() else 'ZDesk — remote access companion';self.root.withdraw()
-            try:self.tray.notify('ZDesk is still available. Use the tray menu to open, disconnect, or quit.','ZDesk')
-            except Exception:pass
         else:self.quit()
     def quit(self):
         self.exiting=True;self.disconnect()
@@ -321,6 +322,9 @@ class Companion:
         self.root.after(600,self.root.destroy)
 
 if __name__=='__main__':
+    if '--desktop-self-test' in sys.argv:
+        from desktop_probe import run as probe
+        probe(Companion,sys.argv[sys.argv.index('--desktop-self-test')+1]);sys.exit(0)
     if '--self-test' in sys.argv:
         output=Path(sys.argv[sys.argv.index('--self-test')+1])
         try:

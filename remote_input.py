@@ -1,5 +1,5 @@
 """Validated remote input with bounded holds and release on disconnect."""
-import math,time
+import math,time,sys
 KEYS=set('abcdefghijklmnopqrstuvwxyz0123456789')|{'enter','tab','backspace','esc','space','up','down','left','right','delete','home','end','pageup','pagedown','shift','ctrl','alt','win','capslock','insert','-','=','[',']',';','\'',',','.','/','\\','`'}|{f'f{i}' for i in range(1,13)}
 CURSORS={'default','text','pointer','wait','progress','crosshair','ew-resize','ns-resize','nwse-resize','nesw-resize','move','not-allowed'}
 def validate(c):
@@ -40,9 +40,9 @@ class Controller:
             if kind=='click':self.pg.click(button=button)
             elif kind=='pointer_down' and button not in self.buttons:self.pg.mouseDown(button=button);self.buttons.add(button)
             elif kind=='pointer_up' and button in self.buttons:self.pg.mouseUp(button=button);self.buttons.discard(button)
-        elif kind=='key':self.pg.press(c['key'])
-        elif kind=='key_down' and c['key'] not in self.keys:self.pg.keyDown(c['key']);self.keys.add(c['key'])
-        elif kind=='key_up' and c['key'] in self.keys:self.pg.keyUp(c['key']);self.keys.discard(c['key'])
+        elif kind=='key':self.pg.press('command' if sys.platform=='darwin' and c['key']=='win' else c['key'])
+        elif kind=='key_down' and c['key'] not in self.keys:self.pg.keyDown('command' if sys.platform=='darwin' and c['key']=='win' else c['key']);self.keys.add(c['key'])
+        elif kind=='key_up' and c['key'] in self.keys:self.pg.keyUp('command' if sys.platform=='darwin' and c['key']=='win' else c['key']);self.keys.discard(c['key'])
         elif kind=='text':self.pg.write(c['text'],interval=.002)
         elif kind=='scroll':self.pg.scroll(c['amount'])
     def tick(self):
@@ -53,7 +53,7 @@ class Controller:
         old=self.pg.FAILSAFE;self.pg.FAILSAFE=False
         try:
             for key in list(self.keys):
-                try:self.pg.keyUp(key)
+                try:self.pg.keyUp('command' if sys.platform=='darwin' and key=='win' else key)
                 except Exception:pass
             for button in list(self.buttons):
                 try:self.pg.mouseUp(button=button)

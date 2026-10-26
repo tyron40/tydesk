@@ -4,8 +4,9 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from flask import render_template, send_file, abort
+import download_catalog
 ROOT=Path(__file__).resolve().parent
-FILES=['camera_capture.py','remote_input.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
+FILES=['desktop_runtime.py','desktop_shell.py','desktop_probe.py','camera_capture.py','remote_input.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
        'requirements.txt','start-agent.ps1','install-startup.ps1','uninstall-startup.ps1','LICENSE']
 
 def windows_exe():
@@ -16,10 +17,19 @@ def install(app, durable_devices=None):
     durable=bool(os.environ.get('TYDESK_REGISTRY_URL')) if durable_devices is None else durable_devices
     @app.get('/companion')
     def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),android_app_available=(ROOT/'downloads'/'ZDesk-Android.apk').is_file(),durable_devices=durable)
+    @app.get('/downloads')
+    def all_downloads():return render_template('downloads.html',downloads=download_catalog.available(ROOT))
+    @app.get('/download/<target>')
+    def platform_download(target):
+        entry=next((e for e in download_catalog.CATALOG if e['id']==target),None)
+        if entry is None:abort(404)
+        file=ROOT/'downloads'/entry['filename']
+        if not file.is_file():abort(503,description='This platform build has not been published yet.')
+        return send_file(file,mimetype=entry['mimetype'],as_attachment=True,download_name=entry['filename'])
     @app.get('/api/downloads')
     def download_info():
         exe=windows_exe()
-        return {'windows_app_available':exe.is_file(),'filename':'ZDesk.exe' if exe.is_file() else 'ZDesk-Windows-Companion.zip'}
+        return {'windows_app_available':exe.is_file(),'filename':'ZDesk.exe' if exe.is_file() else 'ZDesk-Windows-Companion.zip','platforms':download_catalog.available(ROOT)}
     @app.get('/download/windows')
     def download():
         exe=windows_exe()

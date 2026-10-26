@@ -182,3 +182,14 @@ Camera JPEG frames are kept only as a current in-memory frame, require the devic
 Mobile expanded sessions use native fullscreen when available and a safe-area-aware full-window layout otherwise. Controls reveals touch mode, zoom, camera/audio and file tools. Fit screen preserves pointer coordinates without letterbox offsets; trackpad supports hold-then-drag, two-finger scrolling and jitter filtering.
 
 Select all sharing features selects the locally available camera, audio, control and file options. It does not enable sign-in startup or tray behavior, bypass Accessibility setup, or start a disconnected companion. Custom repeated permission dialogs are replaced by inline explanations; OS permissions, active sharing indicators, Stop controls and uninstall confirmation remain. Android notification updates alert only once.
+
+
+### Desktop downloads by operating system and processor
+
+Open `/downloads` for a single brand-independent catalog: Windows Intel/AMD x64, macOS 15+ Intel and Apple Silicon, Linux X11 Intel/AMD x64 and ARM64 (Ubuntu 22.04+ / glibc 2.35+), plus Android. Links only become available once a corresponding artifact exists. `/api/downloads` includes an allowlisted catalog, availability, version and checksum when published. Downloads are served directly by the ZDesk website, with no GitHub redirect.
+
+Mac and Linux native apps share the same visible UI, pairing, local camera/microphone choices, input protocol, files and dashboard sessions. Mac permissions must be enabled locally in System Settings; microphone works through CoreAudio, but system playback loopback is not included. Linux uses X11 capture and input, with PulseAudio / PipeWire Pulse compatibility for audio. Wayland whole-desktop control, Alpine/musl, obsolete 32-bit desktops, legacy macOS and native Windows ARM are outside these build targets. ChromeOS uses browser sharing with its existing limits; there is no native ChromeOS unattended-control app.
+
+Saved Windows enrollment stays DPAPI-protected. Mac and Linux enrollment uses the OS Keychain, Secret Service or KWallet and refuses plaintext storage. If the secure store is absent or locked, manual pairing remains available; remembered pairing requires unlocking/configuring the secure store. Login startup and shortcuts are explicit local actions and run as the signed-in user. Remote uninstall is still advertised only by the Windows and Android builds that implement it.
+
+The Mac/Linux workflow builds on each matching OS and CPU, runs platform tests and exercises the actual packaged UI without requesting capture permissions, before publishing downloads. Mac bundles are ad-hoc signed development apps, not Apple-notarized releases. These automated tests do not certify every laptop model, camera, audio driver, display setup or restricted device. Hardware testing is still required.

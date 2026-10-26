@@ -26,7 +26,9 @@ def target():
     return Path(sys.executable).with_name('pythonw.exe'),'"'+str(Path(__file__).with_name('agent.py'))+'" --autostart'
 
 def desktop_shortcut():
-    if os.name!='nt':raise RuntimeError('Windows only')
+    if os.name!='nt':
+        import desktop_shell
+        return desktop_shell.desktop_shortcut()
     import win32com.client
     shell=win32com.client.Dispatch('WScript.Shell')
     shortcut=shell.CreateShortcut(str(Path(shell.SpecialFolders('Desktop'))/'ZDesk.lnk'))
@@ -35,7 +37,9 @@ def desktop_shortcut():
     shortcut.IconLocation=str(exe)+',0';shortcut.Save()
 
 def startup(enabled):
-    if os.name!='nt':raise RuntimeError('Windows only')
+    if os.name!='nt':
+        import desktop_shell
+        return desktop_shell.startup(enabled)
     exe,args=target();env={**os.environ,'TYDESK_APP_EXE':str(exe),'TYDESK_APP_ARGS':args}
     if enabled:
         script='''$ErrorActionPreference='Stop'

@@ -44,13 +44,13 @@ def sources(sc,system,microphone):
     result=[]
     if system:
         speaker=sc.default_speaker()
-        if speaker is None:raise RuntimeError('No Windows playback device is enabled.')
+        if speaker is None:raise RuntimeError('No playback device is enabled.')
         loopback=sc.get_microphone(id=str(speaker.id),include_loopback=True)
         if not loopback.isloopback:raise RuntimeError('Playback loopback is unavailable.')
         result.append(loopback)
     if microphone:
         mic=sc.default_microphone()
-        if mic is None or mic.isloopback:raise RuntimeError('No physical microphone is available. Select an input in Windows Sound settings and allow desktop microphone access.')
+        if mic is None or mic.isloopback:raise RuntimeError('No physical microphone is available. Select a physical input in your system sound settings and allow microphone access for ZDesk.')
         result.append(mic)
     return result
 

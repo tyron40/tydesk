@@ -165,8 +165,8 @@ def frame_upload(identity):
         cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
         platform=request.headers.get('X-Companion-Platform','unknown')
-        d['platform']=platform if platform in ('windows','android') else 'unknown'
-        d['removal_supported']=d['platform']!='unknown' and request.headers.get('X-Companion-Removal')=='1'
+        d['platform']=platform if platform in ('windows','android','macos','linux') else 'unknown'
+        d['removal_supported']=d['platform'] in ('windows','android') and request.headers.get('X-Companion-Removal')=='1'
         d['camera'] = request.headers.get('X-Allow-Camera') == 'yes'
         if not d['camera']:d['camera_frame']=b'';d['camera_seen']=0
         d['audio'] = request.headers.get('X-Allow-Audio') == 'yes'

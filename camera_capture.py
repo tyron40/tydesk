@@ -1,4 +1,5 @@
 """Visible, locally opted-in Windows webcam sharing, with automatic camera detection and immediate local Stop."""
+import sys
 import threading
 import queue
 import requests
@@ -7,7 +8,8 @@ import requests
 def open_camera(cv, stop, allowed, index=None):
     # Try the default first, then alternate Windows capture backends/devices.
     for device in ([index] if index is not None else range(4)):
-        for backend in (cv.CAP_DSHOW, cv.CAP_MSMF):
+        backends=(cv.CAP_DSHOW,cv.CAP_MSMF) if sys.platform=='win32' else (cv.CAP_AVFOUNDATION,cv.CAP_ANY) if sys.platform=='darwin' else (cv.CAP_V4L2,cv.CAP_ANY)
+        for backend in backends:
             if stop.is_set() or not allowed.is_set():return None, None
             capture=None
             try:
@@ -23,7 +25,7 @@ def open_camera(cv, stop, allowed, index=None):
                 pass
             if capture is not None:capture.release()
     if stop.is_set() or not allowed.is_set():return None,None
-    raise RuntimeError('No working camera found. Check the camera privacy switch, Windows Settings > Privacy & security > Camera > desktop app access, and close other camera apps.')
+    raise RuntimeError('No working camera found. Check the camera privacy switch, your operating system camera privacy permission for ZDesk, and close other camera apps.')
 
 
 def run(base, token, stop, allowed, notify, index=None):
