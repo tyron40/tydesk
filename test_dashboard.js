@@ -46,3 +46,17 @@ function wave(){const b=Buffer.alloc(44+4800*4);b.write('RIFF');b.writeUInt32LE(
  const player=new Player();await player.start();assert.equal(player.context.state,'running');player.push(bytes.toString('base64'));assert.equal(player.sources.size,1);player.setVolume(.5);assert.equal(player.gain.gain.value,.5);player.stop();assert.equal(stopped,1);assert.equal(closed,1);assert.equal(player.context,null);
  console.log('PASS: mouse movement/drag, touch tap/drag/right-click/two-finger scroll, trackpad/pan, key release, PCM tone playback/resume/volume/stop');
 })().catch(e=>{console.error(e);process.exit(1)});
+
+{
+ const vm=require('node:vm'),fs=require('node:fs');
+ function browserOptions(screenAvailable){
+  const nodes=new Map(),node=()=>({checked:false,disabled:false});let prompts=0;
+  const c={document:{querySelector:id=>{if(!nodes.has(id))nodes.set(id,node());return nodes.get(id)},createElement:()=>({getContext:()=>({})})},navigator:{mediaDevices:{getDisplayMedia:screenAvailable?()=>{prompts++}:undefined,getUserMedia:()=>{prompts++}}},window:{addEventListener(){}},Map,Set,console};
+  vm.createContext(c);vm.runInContext(fs.readFileSync('static/browser-companion.js','utf8'),c);
+  vm.runInContext("$('#selectAll').onclick()",c);
+  assert.equal(nodes.get('#screenPermission').checked,screenAvailable);assert(nodes.get('#micPermission').checked);assert(nodes.get('#filePermission').checked);assert.equal(prompts,0,'Select all must not request permissions or start capture');
+  nodes.get('#micPermission').checked=false;vm.runInContext("device={id:'active'};$('#selectAll').onclick()",c);assert.equal(nodes.get('#micPermission').checked,false,'Active sharing options remain locked');
+ }
+ browserOptions(true);browserOptions(false);
+ console.log('PASS: browser Select all respects screen support and does not start capture or request permissions');
+}

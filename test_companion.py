@@ -13,14 +13,19 @@ class CompanionTests(unittest.TestCase):
   return a
  def test_camera_consent_is_saved_and_stop_camera_revokes_saved_choice(self):
   a=self.app();a.camera_permission.get.return_value=True;a.save=Mock()
-  with patch('agent.messagebox.askokcancel',return_value=True):a.camera_changed()
+  with patch('agent.messagebox.askokcancel') as popup:
+   a.camera_changed();popup.assert_not_called()
   self.assertTrue(a.camera.is_set());a.save.assert_called_once()
   a.stop_camera();self.assertFalse(a.camera.is_set());a.camera_permission.set.assert_called_with(False)
   self.assertEqual(a.save.call_count,2)
- def test_camera_consent_cancel_does_not_start_or_save(self):
-  a=self.app();a.camera_permission.get.return_value=True;a.save=Mock()
-  with patch('agent.messagebox.askokcancel',return_value=False):a.camera_changed()
-  self.assertFalse(a.camera.is_set());a.save.assert_not_called()
+ def test_all_sharing_selects_permissions_without_connecting_or_enabling_startup(self):
+  a=self.app();a.control=Mock();a.system_audio=Mock();a.microphone=Mock();a.file_permission=Mock();a.mic=threading.Event();a.save=Mock();a.connect=Mock()
+  with patch('agent.messagebox.askokcancel') as popup:
+   a.select_all_sharing();popup.assert_not_called()
+  self.assertTrue(all(e.is_set() for _,e in a.sharing_options()));a.connect.assert_not_called()
+  a.unattended.set.assert_not_called();a.background.set.assert_not_called()
+  a.select_all_sharing(False);self.assertTrue(all(not e.is_set() for _,e in a.sharing_options()))
+  self.assertEqual(a.save.call_count,2)
  def test_camera_setting_survives_disconnect_but_hardware_stops(self):
   a=self.app();a.camera.set();a.camera_permission.get.return_value=True
   a.disconnect();self.assertFalse(a.camera.is_set());self.assertTrue(a.stop.is_set())

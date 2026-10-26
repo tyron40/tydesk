@@ -15,6 +15,7 @@ async function stopSharing(message='Sharing stopped. Use a valid connection pass
  blobURLs.forEach(URL.revokeObjectURL);blobURLs=[];completed.clear();outgoing.clear();$('#incoming').replaceChildren();$('#preview').srcObject=null;$('#live').hidden=true;$('#start').disabled=false;$('#stop').disabled=true;starting=false;ui(message);await disconnect(d);
 }
 $('#stop').onclick=()=>stopSharing();
+$('#selectAll').onclick=()=>{if(starting||device)return;$('#screenPermission').checked=hasScreen;$('#micPermission').checked=true;$('#filePermission').checked=true;ui('All available sharing features selected. Choose files if needed, then Share this computer to start.');};
 $('#form').onsubmit=async event=>{
  event.preventDefault();if(starting||device)return;const screen=$('#screenPermission').checked,mic=$('#micPermission').checked,files=$('#filePermission').checked;
  if(!screen&&!mic&&!files){ui('Choose at least one sharing option.');return}
