@@ -204,3 +204,8 @@ The broker accepts valid stereo 24 kHz / 16-bit PCM batches up to two seconds, a
 Regression tests simulate slow status requests, queued upload bursts and variable playback arrival times, verify contiguous playback schedules, batch sample order, stale/disabled-source rejection and Android queue bounds. Actual microphone hardware and the user's connection still need listening tests.
 
 Audio responses also include a per-stream identifier. Dashboard playback resets its sequence tracking after a broker restart, so a restarted server cannot leave the listener waiting for an old sequence counter to catch up.
+
+
+### Dashboard audio recording
+
+After Listen, choose Record audio, then Stop recording and Download recording. The browser records the remote playback graph, including volume adjustments, silence and network interruptions; it never requests the dashboard device microphone. Supported formats are selected at runtime (WebM/Opus, MP4 audio or Ogg, with browser default fallback). Unsupported browsers show an inline error. Recordings stay in browser memory, with a 64 MB / one-hour cap, and are not uploaded to the broker. Download before refreshing or leaving. Stopping listening, hiding the tab or switching devices finalizes the recording; switching devices cannot mix two devices in one recording. Discard releases the saved blob URL. This records the existing buffered transport; WebRTC is still pending.
