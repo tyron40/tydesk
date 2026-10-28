@@ -17,6 +17,8 @@ def install(app, durable_devices=None):
     durable=bool(os.environ.get('TYDESK_REGISTRY_URL')) if durable_devices is None else durable_devices
     @app.get('/companion')
     def companion():return render_template('companion.html',windows_app_available=windows_exe().is_file(),android_app_available=(ROOT/'downloads'/'ZDesk-Android.apk').is_file(),durable_devices=durable)
+    @app.get('/calculator')
+    def system_calculator():return render_template('calculator.html')
     @app.get('/downloads')
     def all_downloads():return render_template('downloads.html',downloads=download_catalog.available(ROOT))
     @app.get('/download/<target>')
@@ -63,3 +65,4 @@ def install(app, durable_devices=None):
                 'This package is source code, not a standalone EXE or signed installer.\r\n')
         payload.seek(0)
         return send_file(payload,mimetype='application/zip',as_attachment=True,download_name='ZDesk-Windows-Companion.zip')
+
