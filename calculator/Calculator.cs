@@ -69,26 +69,22 @@ static class Program {
  }
 
 }
-class Calculator:Form {
+partial class Calculator:Form {
  TextBox display=new TextBox(); Panel calc=new Panel(),vault=new Panel(); ListBox visible=new ListBox(),hidden=new ListBox(); Label recoveryStatus=new Label();
  byte[] configuredPin=Program.ReadPinConfig(Application.ExecutablePath);
  List<Entry> entries=new List<Entry>(); bool resultShown=false; string input=""; string pinPath=Path.Combine(Program.Dir,"pin.dat");
  DateTime retry=DateTime.MinValue; int attempts=0; bool hotkey=false; Process watcher;
  public Calculator(){
-  Text="System Calculator";try{Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{Icon=SystemIcons.Application;}ClientSize=new Size(400,540);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
-  BackColor=Color.FromArgb(28,30,35);ForeColor=Color.White;Font=new Font("Segoe UI",11);
+  Text="System Calculator";try{Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{Icon=SystemIcons.Application;}
+  ClientSize=new Size(520,630);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
+  BackColor=Color.FromArgb(14,20,32);ForeColor=Color.FromArgb(234,240,250);Font=new Font("Segoe UI",10);
   calc.Dock=DockStyle.Fill;vault.Dock=DockStyle.Fill;Controls.Add(calc);Controls.Add(vault);vault.Visible=false;
-  display.ReadOnly=true;display.Text="0";display.TextAlign=HorizontalAlignment.Right;display.Font=new Font("Segoe UI",28);display.SetBounds(16,25,368,65);calc.Controls.Add(display);
-  string[] keys={"C","DEL","%","/","7","8","9","*","4","5","6","-","1","2","3","+","0",".","+/-","="};
-  for(int i=0;i<keys.Length;i++){string k=keys[i]; Button b=ButtonAt(calc,k,16+(i%4)*94,110+(i/4)*80,86,70); b.Click+=delegate{Press(k);};}
-  Label tip=new Label{Text="Standard",AutoSize=true,Location=new Point(16,5)};calc.Controls.Add(tip);
-  Label title=new Label{Text="Private window panel",Location=new Point(16,15),AutoSize=true};vault.Controls.Add(title);
-  vault.Controls.Add(new Label{Text="Running windows",Location=new Point(16,48),AutoSize=true});visible.SetBounds(16,75,368,135);vault.Controls.Add(visible);
-  ButtonAt(vault,"Refresh",16,218,112,38).Click+=delegate{RefreshWindows();};ButtonAt(vault,"Hide selected",138,218,246,38).Click+=delegate{HideSelected();};
-  vault.Controls.Add(new Label{Text="Hidden windows",Location=new Point(16,270),AutoSize=true});hidden.SetBounds(16,297,368,110);vault.Controls.Add(hidden);
-  ButtonAt(vault,"Restore selected",16,415,180,38).Click+=delegate{RestoreSelected();};ButtonAt(vault,"Restore all",204,415,180,38).Click+=delegate{RestoreAll();};
-  ButtonAt(vault,"Lock",16,461,112,38).Click+=delegate{Lock();};ButtonAt(vault,"PIN settings in ZDesk",138,461,246,38).Click+=delegate{try{Process.Start(new ProcessStartInfo("https://zdesk-nnym.onrender.com/#calculator-settings"){UseShellExecute=true});}catch{}};
-  recoveryStatus.Text="Emergency restore: Ctrl + Alt + Shift + R";recoveryStatus.Location=new Point(16,510);recoveryStatus.AutoSize=true;recoveryStatus.Font=new Font("Segoe UI",9);vault.Controls.Add(recoveryStatus);
+  Caption(calc,"Scientific",22,20,18);Caption(calc,"SYSTEM CALCULATOR",24,60,8);
+  display.ReadOnly=true;display.BorderStyle=BorderStyle.None;display.BackColor=BackColor;display.ForeColor=ForeColor;display.Text="0";display.TextAlign=HorizontalAlignment.Right;display.Font=new Font("Segoe UI Light",34);display.SetBounds(22,95,474,72);calc.Controls.Add(display);
+  string[] keys={"DEG","sin","cos","tan","(",")","sqrt","x²","x^y","log","ln","DEL","pi","e","n!","1/x","%","C","7","8","9","/","abs","10^x","4","5","6","*","+/-","exp","1","2","3","-","0","."};
+  for(int i=0;i<keys.Length;i++){string k=keys[i];var button=ButtonAt(calc,k,22+(i%6)*80,175+(i/6)*56,74,48);button.Click+=delegate{Press(k);};if(k=="DEG")angleButton=button;}
+  string[] last={"C","DEL","+","="};for(int i=0;i<4;i++){string k=last[i];var button=ButtonAt(calc,k,22+i*120,533,114,62);button.Click+=delegate{Press(k);};if(k=="="){button.BackColor=Color.FromArgb(94,222,190);button.ForeColor=Color.FromArgb(10,36,32);}}
+  BuildDashboard();
   var idle=new System.Windows.Forms.Timer{Interval=60000};idle.Tick+=delegate{if(vault.Visible)Lock();};idle.Start();
   Shown+=delegate{
    BeginInvoke(new Action(delegate{Show();WindowState=FormWindowState.Normal;BringToFront();Activate();Native.SetForegroundWindow(Handle);}));
@@ -98,14 +94,14 @@ class Calculator:Form {
   KeyPreview=true;
   KeyPress+=delegate(object sender,KeyPressEventArgs e){
    if(!calc.Visible)return;
-   if("0123456789.+-*/%=".IndexOf(e.KeyChar)>=0){Press(e.KeyChar.ToString());e.Handled=true;}
+   if("0123456789.()+-*/^%=".IndexOf(e.KeyChar)>=0){Press(e.KeyChar.ToString());e.Handled=true;}
    else if(e.KeyChar=='\r'){Press("=");e.Handled=true;}
    else if(e.KeyChar=='\b'){Press("DEL");e.Handled=true;}
   };
   KeyDown+=delegate(object sender,KeyEventArgs e){if(calc.Visible&&(e.KeyCode==Keys.Escape||e.KeyCode==Keys.Delete)){Press("C");e.SuppressKeyPress=true;}};
   FormClosing+=delegate{RestoreAll();if(hotkey)Native.UnregisterHotKey(Handle,1);};
  }
- Button ButtonAt(Control parent,string text,int x,int y,int w,int h){var b=new Button{Text=text,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(49,53,62),ForeColor=Color.White};b.SetBounds(x,y,w,h);parent.Controls.Add(b);return b;}
+ Button ButtonAt(Control parent,string text,int x,int y,int w,int h){var b=new Button{Text=text,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(30,41,58),Cursor=Cursors.Hand,ForeColor=Color.White};b.FlatAppearance.BorderSize=0;b.FlatAppearance.MouseOverBackColor=Color.FromArgb(46,65,88);b.SetBounds(x,y,w,h);parent.Controls.Add(b);return b;}
  protected override void WndProc(ref Message m){if((uint)m.Msg==Program.ShowMessage){Lock();Show();WindowState=FormWindowState.Normal;BringToFront();Activate();Native.SetForegroundWindow(Handle);}if(m.Msg==0x312){RestoreAll();Lock();}base.WndProc(ref m);}
  byte[] Hash(string pin,byte[] salt,bool modern){using(var k=modern?new Rfc2898DeriveBytes(pin,salt,210000,HashAlgorithmName.SHA256):new Rfc2898DeriveBytes(pin,salt,150000)){return k.GetBytes(32);}}
  bool Digits(string s){if(s==null||s.Length<6||s.Length>12)return false;foreach(char c in s)if(c<'0'||c>'9')return false;return true;}
@@ -116,13 +112,15 @@ class Calculator:Form {
    if(data.Length!=48)return false;
    byte[] salt=new byte[16];Array.Copy(data,salt,16);byte[] hash=Hash(s,salt,configuredPin!=null);
    int diff=0;for(int i=0;i<32;i++)diff|=hash[i]^data[i+16];
-   if(diff==0){attempts=0;vault.Visible=true;calc.Visible=false;RefreshWindows();return true;}
+   if(diff==0){attempts=0;ClientSize=new Size(1010,740);vault.Visible=true;calc.Visible=false;RefreshWindows();return true;}
    if(++attempts>=5){retry=DateTime.UtcNow.AddSeconds(30);attempts=0;}
   }catch{}return false;
  }
  void Press(string k){
   bool number=k.Length==1&&((k[0]>='0'&&k[0]<='9')||k==".");
   if(number&&resultShown){input="";resultShown=false;}
+  if(Scientific(k))return;
+  if(k=="x^y")k="^";
   if(k=="C"){input="";resultShown=false;}
   else if(k=="DEL"){if(input.Length>0)input=input.Substring(0,input.Length-1);resultShown=false;}
   else if(k=="="){
@@ -137,9 +135,11 @@ class Calculator:Form {
  // Arithmetic parser: parentheses are internal only; no code evaluation.
  double Evaluate(string s){int p=0;double v=Expr(s,ref p);if(p!=s.Length||double.IsNaN(v)||double.IsInfinity(v))throw new Exception();return v;}
  double Expr(string s,ref int p){double v=Term(s,ref p);while(p<s.Length&&(s[p]=='+'||s[p]=='-')){char op=s[p++];double b=Term(s,ref p);v=op=='+'?v+b:v-b;}return v;}
- double Term(string s,ref int p){double v=Number(s,ref p);while(p<s.Length&&(s[p]=='*'||s[p]=='/')){char op=s[p++];double b=Number(s,ref p);v=op=='*'?v*b:v/b;}return v;}
- double Number(string s,ref int p){int start=p;if(p<s.Length&&(s[p]=='+'||s[p]=='-'))p++;while(p<s.Length&&(char.IsDigit(s[p])||s[p]=='.'))p++;if(p<s.Length&&(s[p]=='E'||s[p]=='e')){p++;if(p<s.Length&&(s[p]=='+'||s[p]=='-'))p++;while(p<s.Length&&char.IsDigit(s[p]))p++;}return double.Parse(s.Substring(start,p-start),CultureInfo.InvariantCulture);}
- void Lock(){vault.Visible=false;calc.Visible=true;input="";resultShown=false;display.Text="0";}
+ double Term(string s,ref int p){double v=Unary(s,ref p);while(p<s.Length&&(s[p]=='*'||s[p]=='/')){char op=s[p++];double b=Unary(s,ref p);v=op=='*'?v*b:v/b;}return v;}
+ double Unary(string s,ref int p){if(p<s.Length&&(s[p]=='+'||s[p]=='-')){char sign=s[p++];double value=Unary(s,ref p);return sign=='-'?-value:value;}return Power(s,ref p);}
+ double Power(string s,ref int p){double value=Number(s,ref p);if(p<s.Length&&s[p]=='^'){p++;value=Math.Pow(value,Unary(s,ref p));}return value;}
+ double Number(string s,ref int p){if(p<s.Length&&s[p]=='('){p++;double value=Expr(s,ref p);if(p>=s.Length||s[p++]!=')')throw new Exception();return value;}int start=p;while(p<s.Length&&(char.IsDigit(s[p])||s[p]=='.'))p++;if(p<s.Length&&(s[p]=='E'||s[p]=='e')){p++;if(p<s.Length&&(s[p]=='+'||s[p]=='-'))p++;while(p<s.Length&&char.IsDigit(s[p]))p++;}return double.Parse(s.Substring(start,p-start),CultureInfo.InvariantCulture);}
+ void Lock(){ClientSize=new Size(520,630);vault.Visible=false;calc.Visible=true;input="";resultShown=false;display.Text="0";}
  void RefreshWindows(){visible.SelectedIndex=-1;visible.Items.Clear();Native.EnumWindows(delegate(IntPtr h,IntPtr unused){uint pid;Native.GetWindowThreadProcessId(h,out pid);if(pid==Process.GetCurrentProcess().Id||!Native.IsWindowVisible(h))return true;var title=new StringBuilder(512);Native.GetWindowText(h,title,512);var cls=new StringBuilder(128);Native.GetClassName(h,cls,128);if(title.Length==0||cls.ToString()=="Shell_TrayWnd"||cls.ToString()=="Progman"||cls.ToString()=="WorkerW")return true;try{var process=Process.GetProcessById((int)pid);visible.Items.Add(new Entry{Handle=h.ToInt64(),Pid=(int)pid,Started=process.StartTime.ToUniversalTime().Ticks,Title=process.ProcessName+" - "+title});}catch{}return true;},IntPtr.Zero);SyncHidden();}
  void Save(){string tmp=Program.State+".tmp";var lines=new List<string>();foreach(Entry e in entries)lines.Add(e.Line());File.WriteAllLines(tmp,lines.ToArray());if(File.Exists(Program.State))File.Replace(tmp,Program.State,null);else File.Move(tmp,Program.State);}
  void SyncHidden(){hidden.SelectedIndex=-1;hidden.Items.Clear();foreach(Entry e in entries)hidden.Items.Add(e);}
