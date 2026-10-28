@@ -17,6 +17,8 @@ class WindowsSmoke {
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,StringBuilder l);
  [DllImport("user32.dll",SetLastError=true)] static extern IntPtr SendMessageTimeout(IntPtr h,uint m,IntPtr w,IntPtr l,uint flags,uint timeout,out IntPtr result);
  [DllImport("user32.dll",SetLastError=true)] static extern bool PostMessage(IntPtr h,uint message,IntPtr w,IntPtr l);
+ [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr h);
+ [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
  static string Text(IntPtr h){var s=new StringBuilder(1024);SendMessage(h,0xD,new IntPtr(s.Capacity),s);return s.ToString();}
  static string Class(IntPtr h){var s=new StringBuilder(256);GetClassName(h,s,s.Capacity);return s.ToString();}
  static void Wait(Func<bool> condition,string why,int seconds=20){var watch=Stopwatch.StartNew();while(!condition()){if(watch.Elapsed.TotalSeconds>seconds)throw new Exception(why);Application.DoEvents();Thread.Sleep(80);}Application.DoEvents();}
@@ -24,7 +26,7 @@ class WindowsSmoke {
  static void Click(IntPtr h,string text){foreach(var c in Children(h))if(Class(c).IndexOf("button",StringComparison.OrdinalIgnoreCase)>=0&&Text(c)==text){if(!PostMessage(c,0xF5,IntPtr.Zero,IntPtr.Zero))throw new Exception("Could not post button click: "+text);for(int i=0;i<5;i++){Application.DoEvents();Thread.Sleep(30);}return;}foreach(var child in Children(h))Console.WriteLine("Visible control: "+Class(child)+" / "+Text(child));throw new Exception("Missing visible button: "+text);}
  static string Display(IntPtr h){foreach(var c in Children(h))if(Class(c).IndexOf("edit",StringComparison.OrdinalIgnoreCase)>=0){var s=new StringBuilder(1024);SendMessage(c,0xD,new IntPtr(s.Capacity),s);return s.ToString();}throw new Exception("No calculator display");}
  static bool HasLabel(IntPtr h,string text){foreach(var c in Children(h))if(Text(c)==text)return true;return false;}
- static void SelectTarget(IntPtr h,string title){foreach(var c in Children(h)){if(Class(c).IndexOf("listbox",StringComparison.OrdinalIgnoreCase)<0)continue;int count=SendMessage(c,0x18B,IntPtr.Zero,IntPtr.Zero).ToInt32();for(int i=0;i<count;i++){var s=new StringBuilder(2048);SendMessage(c,0x189,new IntPtr(i),s);if(s.ToString().Contains(title)){SendMessage(c,0x186,new IntPtr(i),IntPtr.Zero);return;}}}throw new Exception("Test target window is missing from window list");}
+ static void SelectTarget(IntPtr h,string title){foreach(var c in Children(h)){if(Class(c).IndexOf("listbox",StringComparison.OrdinalIgnoreCase)<0)continue;int count=SendMessage(c,0x18B,IntPtr.Zero,IntPtr.Zero).ToInt32();for(int i=0;i<count;i++){var s=new StringBuilder(2048);SendMessage(c,0x189,new IntPtr(i),s);if(s.ToString().Contains(title)){SendMessage(c,0x186,new IntPtr(i),IntPtr.Zero);SendMessage(GetParent(c),0x111,new IntPtr((GetDlgCtrlID(c)&0xffff)|(1<<16)),c);Application.DoEvents();return;}}}throw new Exception("Test target window is missing from window list");}
  [STAThread] static int Main(string[] args){
   Process app=null;Form target=null;
   try{
