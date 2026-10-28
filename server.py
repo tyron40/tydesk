@@ -47,16 +47,23 @@ def admin(fn):
     @wraps(fn)
     def wrapped(*a, **kw):
         supplied = request.headers.get('Authorization', '').removeprefix('Bearer ')
-        # Bound invalid password attempts without retaining supplied credentials.
+        # Successful authentication must not be locked out by unrelated invalid
+        # requests sharing a reverse-proxy address. Never reset the failure
+        # budget on success: invalid requests remain throttled independently.
+        if secrets.compare_digest(supplied.encode('utf-8'), ADMIN.encode('utf-8')):
+            return fn(*a, **kw)
         with lock:
             now = time.monotonic(); peer = request.remote_addr or 'unknown'
             if len(failed_auth)>1000: failed_auth.clear()
             failures = failed_auth.setdefault(peer, deque(maxlen=20))
             while failures and now-failures[0]>60: failures.popleft()
-            if len(failures)>=20: abort(429)
-            if not secrets.compare_digest(supplied, ADMIN):
-                failures.append(now); abort(401)
-        return fn(*a, **kw)
+            if len(failures)>=20:
+                response=jsonify(error='Too many incorrect password attempts. Try again shortly.')
+                response.status_code=429
+                response.headers['Retry-After']=str(max(1,math.ceil(60-(now-failures[0]))))
+                return response
+            failures.append(now)
+            abort(401)
     return wrapped
 
 def device(identity):

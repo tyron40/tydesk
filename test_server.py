@@ -6,7 +6,17 @@ class BrokerTests(unittest.TestCase):
     def setUp(self):
         server.enrollment_gate=server.connection_access.EnrollmentGate()
         self.c=server.app.test_client(); self.admin={'Authorization':'Bearer '+server.ADMIN}
-        server.devices.clear(); server.pairings.clear();server.db.execute('DELETE FROM devices');server.db.commit()
+        server.failed_auth.clear();server.devices.clear(); server.pairings.clear();server.db.execute('DELETE FROM devices');server.db.commit()
+    def test_correct_password_survives_proxy_rate_limit(self):
+        bad={'Authorization':'Bearer incorrect-test-password'}
+        for _ in range(20):self.assertEqual(self.c.get('/api/devices',headers=bad).status_code,401)
+        limited=self.c.get('/api/devices',headers=bad)
+        self.assertEqual(limited.status_code,429)
+        self.assertTrue(1<=int(limited.headers['Retry-After'])<=60)
+        self.assertEqual(self.c.get('/api/devices',headers=self.admin).status_code,200)
+        self.assertEqual(self.c.get('/api/devices',headers=bad).status_code,429)
+    def test_unicode_invalid_password_is_rejected(self):
+        self.assertEqual(self.c.get('/api/devices',headers={'Authorization':'Bearer wrong-🔒'}).status_code,401)
     def enroll(self):
         code=self.c.post('/api/pairing',headers=self.admin).json['code']
         d=self.c.post('/api/enroll',json={'code':code,'name':'Test PC'}).json

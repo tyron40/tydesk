@@ -51,3 +51,20 @@ function fixture(){const nodes=new Map(),events={},opened=[],requests=[];const n
  await vm.runInContext('pollAudio(audioGeneration)',f.c);assert(urls[1].endsWith('after=0'));assert.equal(vm.runInContext('audioSeq',f.c),1);
  console.log('PASS: listening recovers when a broker restart resets audio sequence numbers');
 })().catch(e=>{console.error(e);process.exit(1)});
+
+(async()=>{
+ const f=fixture();let calls=0,resolveRequest;
+ f.c.fetch=async()=>{calls++;await new Promise(resolve=>resolveRequest=resolve);return{ok:false,status:401}};
+ const pending=vm.runInContext("unlockDashboard('wrong-test-password')",f.c);
+ await vm.runInContext("unlockDashboard('second-click')",f.c);assert.equal(calls,1,'Repeated taps cannot create concurrent login attempts');
+ assert(vm.runInContext("$('#unlockButton').disabled",f.c));resolveRequest();await pending;
+ assert(!vm.runInContext('dashboardUnlocked',f.c));assert(!vm.runInContext("$('#unlockButton').disabled",f.c));
+ assert.match(vm.runInContext("$('#loginStatus').textContent",f.c),/not accepted/);
+ const limited=fixture();let retries=0;limited.c.setTimeout=()=>0;
+ limited.c.fetch=async()=>{retries++;return{ok:false,status:429,headers:{get:()=> '12'}}};
+ await vm.runInContext("unlockDashboard('test-rate-limit')",limited.c);
+ assert.match(vm.runInContext("$('#loginStatus').textContent",limited.c),/12 seconds/);
+ await vm.runInContext("unlockDashboard('test-rate-limit')",limited.c);assert.equal(retries,1,'Cooldown must not automatically resubmit passwords');
+ assert(vm.runInContext("$('#unlockButton').disabled",limited.c));
+ console.log('PASS: duplicate login taps blocked, inline password errors, Retry-After cooldown without automatic password retries');
+})().catch(e=>{console.error(e);process.exitCode=1});
