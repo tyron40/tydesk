@@ -35,7 +35,8 @@ jobs:
         shell: pwsh
         run: |
           $compiler = "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe"
-          & $compiler /nologo /target:exe /out:CalculatorSmoke.exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll calculator/WindowsSmoke.cs
+          $testSource = (Resolve-Path "calculator/WindowsSmoke.cs").Path
+          & $compiler /nologo /target:exe /out:CalculatorSmoke.exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll $testSource
           if ($LASTEXITCODE -ne 0) { throw 'Smoke test driver did not compile' }
           & .\CalculatorSmoke.exe 'calculator-dist/System Calculator.exe'
           if ($LASTEXITCODE -ne 0) { throw 'Windows calculator interaction tests failed' }

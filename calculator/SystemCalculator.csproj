@@ -19,6 +19,5 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Calculator.cs" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.14" />
   </ItemGroup>
 </Project>
