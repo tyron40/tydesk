@@ -31,6 +31,14 @@ Deno.serve(async(req:Request)=>{
    if(data.passcode_hash!==null && !/^pbkdf2_sha256\$260000\$[a-f0-9]{32}\$[a-f0-9]{64}$/.test(data.passcode_hash||''))return Response.json({error:'Invalid setting'},{status:400});
    await rest('tydesk_connection_settings','POST',{id:'primary',passcode_hash:data.passcode_hash});return Response.json({ok:true});
   }
+  if(data.op==='get_calculator'){
+   const rows=await rest('tydesk_connection_settings?id=eq.primary&select=calculator_config');
+   return Response.json({calculator_config:rows?.[0]?.calculator_config||null});
+  }
+  if(data.op==='set_calculator'){
+   if(typeof data.calculator_config!=='string'||!/^[a-f0-9]{96}$/.test(data.calculator_config))return Response.json({error:'Invalid calculator setting'},{status:400});
+   await rest('tydesk_connection_settings','POST',{id:'primary',calculator_config:data.calculator_config});return Response.json({ok:true});
+  }
   if(!/^[a-f0-9]{24}$/.test(data.id||''))return Response.json({error:'Invalid device ID'},{status:400});
   if(data.op==='register'){
    if(!/^[a-f0-9]{64}$/.test(data.token||'')||typeof data.name!=='string'||data.name.length<1||data.name.length>80)return Response.json({error:'Invalid device'},{status:400});
@@ -40,3 +48,4 @@ Deno.serve(async(req:Request)=>{
   return Response.json({error:'Invalid operation'},{status:400});
  }catch{return Response.json({error:'Registry temporarily unavailable'},{status:503})}
 });
+

@@ -1,22 +1,17 @@
-# System Calculator 1.2
+# System Calculator 1.3
 
 Open System Calculator.exe on Windows 10/11 with .NET Framework 4.7.2 or newer.
 It starts as a regular calculator without PIN setup dialogs. Keyboard input works.
 
-To configure the private window panel:
-1. Sign in at https://zdesk-nnym.onrender.com/#calculator-settings.
-2. In System Calculator PIN, enter and repeat 6–12 digits.
-3. Click Set PIN & download app.
-4. Close the old calculator and open the newly downloaded System Calculator.exe.
-5. Enter your PIN and press = to unlock the panel.
-
-Changing the PIN requires a fresh configured download. Previously downloaded
-copies retain their own PIN. The website does not remotely change a running app.
-PIN preparation happens in the browser using PBKDF2-HMAC-SHA256, 210,000 iterations
-and a random 16-byte salt. A 64-byte configuration (salt, 32-byte hash, format
-marker ZDESKCALCPIN0002) is appended to the unsigned EXE. The plaintext PIN is
-not sent to the server or saved in browser storage. A generic download has no
-configured PIN; legacy local DPAPI PIN settings remain supported.
+Set your calculator password once in the private ZDesk dashboard. The backend
+saves only a salted PBKDF2-HMAC-SHA256 verifier (210,000 iterations). All future
+normal file downloads automatically append that configuration to the EXE.
+Changing the password changes future downloads; existing files retain their
+previous password. The Windows app opens as a regular calculator with no setup
+prompt. Enter the password and press = to unlock the private window panel.
+The 6–12 digit password is not sent to the backend in plaintext. The stored
+verifier persists in the existing backend-only registry across server restarts.
+The executable remains offline and uses the same 64-byte PIN format as v1.2.
 
 Ctrl+Alt+F12 restores all hidden windows. Normal exit and the recovery monitor
 also attempt restoration. If the hotkey or monitor is unavailable, hiding is
