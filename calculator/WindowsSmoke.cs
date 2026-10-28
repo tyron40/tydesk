@@ -57,9 +57,24 @@ class WindowsSmoke {
    Console.WriteLine("CHECK: password immediately after calculation, without clearing");foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");
    Wait(()=>HasLabel(window,"Private window panel"),"PIN from appended download configuration did not unlock the panel");
    Console.WriteLine("CHECK: file navigation and app catalog");
-   string browserRoot=Path.Combine(Path.GetTempPath(),"CalculatorBrowserFixture");Directory.CreateDirectory(Path.Combine(browserRoot,"Child"));File.WriteAllText(Path.Combine(browserRoot,"Sample.txt"),"test");
+   string browserRoot=Path.Combine(Path.GetTempPath(),"CalculatorBrowserFixture-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(Path.Combine(browserRoot,"Child"));File.WriteAllText(Path.Combine(browserRoot,"Sample.txt"),"test");
    Click(window,"Files");Wait(()=>HasLabel(window,"Your files"),"Files page missing");SetEdit(window,browserRoot);Click(window,"Go");Wait(()=>HasLabel(window,"1 folders · 1 files"),"File browser did not enumerate fixture");
    SelectFirstRow(window);Click(window,"Open selected");Wait(()=>HasLabel(window,"0 folders · 0 files"),"Folder navigation failed");Click(window,"Up");Wait(()=>HasLabel(window,"1 folders · 1 files"),"Parent navigation failed");
+   Console.WriteLine("CHECK: hide and unhide selected folders");
+   string testFolder=Path.Combine(browserRoot,"Child"),testFile=Path.Combine(browserRoot,"Sample.txt");
+   SelectFirstRow(window);Click(window,"Hide selected");Wait(()=>(File.GetAttributes(testFolder)&FileAttributes.Hidden)!=0,"Folder was not hidden");
+   Click(window,"Hidden files");Wait(()=>HasLabel(window,"1 tracked hidden items"),"Hidden folder missing from recovery list");SelectFirstRow(window);Click(window,"Unhide selected");Wait(()=>(File.GetAttributes(testFolder)&FileAttributes.Hidden)==0,"Selected folder was not unhidden");Click(window,"Back to files");
+   Console.WriteLine("CHECK: file hiding, restart persistence, and unhide all without changing contents or read-only attribute");
+   File.SetAttributes(testFile,File.GetAttributes(testFile)|FileAttributes.ReadOnly);
+   SelectFirstRow(window);Click(window,"Hide selected");Wait(()=>(File.GetAttributes(testFolder)&FileAttributes.Hidden)!=0,"Second folder hide failed");
+   SelectFirstRow(window);Click(window,"Hide selected");Wait(()=>(File.GetAttributes(testFile)&FileAttributes.Hidden)!=0,"Selected file was not hidden");
+   app.CloseMainWindow();Wait(()=>app.HasExited,"Calculator did not exit for hidden file persistence test");
+   app=Process.Start(new ProcessStartInfo(configured){UseShellExecute=false});window=IntPtr.Zero;
+   Wait(delegate{app.Refresh();if(app.HasExited)throw new Exception("Restarted calculator exited");window=app.MainWindowHandle;return window!=IntPtr.Zero&&IsWindowVisible(window);},"Calculator restart did not show UI",45);
+   foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");Click(window,"Files");Click(window,"Hidden files");Wait(()=>HasLabel(window,"2 tracked hidden items"),"Hidden file recovery records did not survive restart");
+   Click(window,"Unhide all");Wait(()=>(File.GetAttributes(testFolder)&FileAttributes.Hidden)==0&&(File.GetAttributes(testFile)&FileAttributes.Hidden)==0,"Unhide all did not restore file and folder");
+   if((File.GetAttributes(testFile)&FileAttributes.ReadOnly)==0||File.ReadAllText(testFile)!="test")throw new Exception("Unhide changed file content or read-only attribute");
+   File.SetAttributes(testFile,File.GetAttributes(testFile)&~FileAttributes.ReadOnly);Click(window,"Back to files");SetEdit(window,browserRoot);Click(window,"Go");Wait(()=>HasLabel(window,"1 folders · 1 files"),"Restored items did not return to file browser");
    Console.WriteLine("CHECK: persistent window actions while browsing files and folders");
    RequireQuickControls(window);Click(window,"Refresh windows");SelectQuickTarget(window,target.Text);Click(window,"Hide window");Wait(()=>!IsWindowVisible(target.Handle),"Persistent hide failed on Files page");if(!HasLabel(window,"Your files"))throw new Exception("Hide action navigated away from Files");
    SelectQuickTarget(window,target.Text);Click(window,"Restore window");Wait(()=>IsWindowVisible(target.Handle),"Persistent restore failed on Files page");
@@ -79,7 +94,7 @@ class WindowsSmoke {
    Click(window,"C");foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");SelectTarget(window,target.Text);Click(window,"Hide selected");Wait(()=>!IsWindowVisible(target.Handle),"Second hide failed");
    Console.WriteLine("CHECK: crash recovery");app.Kill();app.WaitForExit();Wait(()=>IsWindowVisible(target.Handle),"Recovery monitor did not restore the test window after process termination",20);
    File.WriteAllText("calculator-windows-smoke.json","{\"ok\":true,\"startup\":true,\"arithmetic\":true,\"download_pin\":true,\"hide_restore\":true,\"lock\":true,\"crash_recovery\":true}");
-   Console.WriteLine("PASS: visible calculator startup, 2+2=4, scientific functions, file navigation, app launch, persistent hide/restore on Files and Apps, configured PIN, hide/restore, lock and crash recovery.");return 0;
+   Console.WriteLine("PASS: visible calculator startup, 2+2=4, scientific functions, file and folder hiding, restart recovery, file navigation, app launch, persistent hide/restore on Files and Apps, configured PIN, hide/restore, lock and crash recovery.");return 0;
   }catch(Exception e){Console.Error.WriteLine(e);try{string log=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CalculatorVault","startup-error.log");if(File.Exists(log)){File.Copy(log,"calculator-startup-error.log",true);Console.Error.WriteLine(File.ReadAllText(log));}}catch{}return 1;}
   finally{try{if(fixture!=null)File.Delete(fixture);}catch{}if(app!=null&&!app.HasExited){app.Kill();app.WaitForExit();}if(target!=null){target.Show();target.Close();}}
  }

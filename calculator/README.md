@@ -1,4 +1,4 @@
-# System Calculator 1.8
+# System Calculator 1.9
 
 Open System Calculator.exe on 64-bit Windows 10/11. The published single EXE
 includes its .NET runtime; no separate .NET installation is needed.
@@ -17,7 +17,15 @@ After password + equals, the redesigned private dashboard contains:
   and All Windows apps (the Windows applications folder, including Store apps).
 
 File access follows the current Windows account permissions. Files open in their
-default app. Browsing does not move, encrypt or hide files or installed programs.
+default app. Browsing does not move or encrypt files or installed programs.
+Files > Hide selected applies the Windows Hidden attribute to selected files or
+folders, removes them from this browser, and records their original paths for
+recovery in Files > Hidden files. Unhide selected/all clears only Hidden and
+preserves other attributes. Recovery information is saved before changing each
+item, persists across app restarts, and is retained if restoration fails. Items
+stay at their original locations. They can still be seen in Explorer when
+Show hidden items is enabled. This is not encryption or access control.
+System paths, this calculator's files, and reparse points are not changed.
 The app browser launches programs normally; Windows handles any permission prompt.
 
 Set your calculator password once in the private ZDesk dashboard. The backend

@@ -28,14 +28,14 @@ partial class Calculator {
   ButtonAt(side,"PIN settings",18,580,154,42).Click+=delegate{OpenPath("https://zdesk-nnym.onrender.com/#calculator-settings");};
   ButtonAt(side,"Lock",18,640,154,48).Click+=delegate{Lock();};
   var body=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24)};vault.Controls.Add(body);body.BringToFront();
-  foreach(var page in new[]{windowsPage,filesPage,appsPage}){page.Dock=DockStyle.Fill;page.AutoScroll=true;page.AutoScrollMinSize=new Size(748,670);body.Controls.Add(page);}
+  foreach(var page in new[]{windowsPage,filesPage,appsPage,hiddenFilesPage}){page.Dock=DockStyle.Fill;page.AutoScroll=true;page.AutoScrollMinSize=new Size(748,670);body.Controls.Add(page);}
   Caption(windowsPage,"Private window panel",0,0,24);Caption(windowsPage,"Keep your workspace focused. Restore windows at any time.",0,48,10);
   Caption(windowsPage,"RUNNING WINDOWS",0,95,9);visible.SetBounds(0,122,748,160);StyleList(visible);windowsPage.Controls.Add(visible);
   ButtonAt(windowsPage,"Refresh",0,294,130,42).Click+=delegate{RefreshWindows();};ButtonAt(windowsPage,"Hide selected",142,294,180,42).Click+=delegate{HideSelected();};
   Caption(windowsPage,"HIDDEN WINDOWS",0,358,9);hidden.SetBounds(0,384,748,140);StyleList(hidden);windowsPage.Controls.Add(hidden);
   ButtonAt(windowsPage,"Restore selected",0,536,180,42).Click+=delegate{RestoreSelected();};ButtonAt(windowsPage,"Restore all",192,536,150,42).Click+=delegate{RestoreAll();};
   recoveryStatus.Text="Emergency restore: Ctrl + Alt + Shift + R";recoveryStatus.SetBounds(0,596,748,30);recoveryStatus.ForeColor=Color.FromArgb(134,157,185);windowsPage.Controls.Add(recoveryStatus);
-  Caption(filesPage,"Your files",0,0,24);Caption(filesPage,"Browse folders and open files with their default Windows app.",0,48,10);
+  Caption(filesPage,"Your files",0,0,24);Caption(filesPage,"Hide selected files and folders, or open them in their default Windows app.",0,48,10);
   string[] names={"Home","Desktop","Documents","Downloads"};string[] paths={Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads")};
   for(int i=0;i<names.Length;i++){string folder=paths[i];ButtonAt(filesPage,names[i],i*132,89,122,38).Click+=delegate{BrowseFolder(folder);};}
   drives.SetBounds(540,94,208,32);drives.DropDownStyle=ComboBoxStyle.DropDownList;foreach(var drive in DriveInfo.GetDrives())drives.Items.Add(drive.Name);filesPage.Controls.Add(drives);drives.SelectedIndexChanged+=delegate{if(drives.SelectedItem!=null)BrowseFolder(drives.SelectedItem.ToString());};
@@ -44,6 +44,10 @@ partial class Calculator {
   ButtonAt(filesPage,"Go",670,142,78,38).Click+=delegate{BrowseFolder(address.Text);};
   SetupView(fileList,filesPage,198);fileList.Columns.Add("Name",380);fileList.Columns.Add("Type",150);fileList.Columns.Add("Size",160);fileList.DoubleClick+=delegate{OpenFileSelection();};
   ButtonAt(filesPage,"Open selected",0,580,160,42).Click+=delegate{OpenFileSelection();};ButtonAt(filesPage,"Open in Explorer",172,580,180,42).Click+=delegate{OpenPath(currentFolder);};fileStatus.SetBounds(0,636,748,30);filesPage.Controls.Add(fileStatus);
+  ButtonAt(filesPage,"Hide selected",364,580,170,42).Click+=delegate{HideFileSelection();};
+  ButtonAt(filesPage,"Hidden files",546,580,190,42).Click+=delegate{RefreshHiddenFiles();ShowPage(hiddenFilesPage);};
+  fileList.MultiSelect=true;
+  BuildHiddenFiles();
   Caption(appsPage,"Your apps",0,0,24);Caption(appsPage,"Launch Start menu apps or browse for a program on this PC.",0,48,10);
   appSearch.SetBounds(0,96,440,32);appSearch.AccessibleName="Search apps";appsPage.Controls.Add(appSearch);appSearch.TextChanged+=delegate{FilterApps();};
   ButtonAt(appsPage,"Refresh apps",452,89,140,42).Click+=delegate{LoadApps();};ButtonAt(appsPage,"All Windows apps",604,89,144,42).Click+=delegate{OpenPath("shell:AppsFolder");};
@@ -67,11 +71,11 @@ partial class Calculator {
  }
  void StyleList(ListBox list){list.BackColor=Color.FromArgb(22,33,49);list.ForeColor=ForeColor;list.BorderStyle=BorderStyle.None;list.IntegralHeight=false;list.ItemHeight=24;}
  void SetupView(ListView view,Control parent,int top){view.SetBounds(0,top,748,365);view.View=View.Details;view.FullRowSelect=true;view.MultiSelect=false;view.HideSelection=false;view.BackColor=Color.FromArgb(22,33,49);view.ForeColor=ForeColor;view.BorderStyle=BorderStyle.None;parent.Controls.Add(view);}
- void ShowPage(Panel page){foreach(var p in new[]{windowsPage,filesPage,appsPage})p.Visible=p==page;page.BringToFront();RefreshWindows();}
+ void ShowPage(Panel page){foreach(var p in new[]{windowsPage,filesPage,appsPage,hiddenFilesPage})p.Visible=p==page;page.BringToFront();RefreshWindows();}
  void BrowseFolder(string path){try{
   string full=Path.GetFullPath(Environment.ExpandEnvironmentVariables(path));var directory=new DirectoryInfo(full);
   var folders=directory.GetDirectories();var files=directory.GetFiles();Array.Sort(folders,(a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Name,b.Name));Array.Sort(files,(a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Name,b.Name));
-  fileList.BeginUpdate();fileList.Items.Clear();foreach(var folder in folders){var row=new ListViewItem(folder.Name);row.SubItems.Add("Folder");row.SubItems.Add("");row.Tag=folder.FullName;fileList.Items.Add(row);}foreach(var file in files){var row=new ListViewItem(file.Name);row.SubItems.Add(file.Extension.Length==0?"File":file.Extension);try{row.SubItems.Add(file.Length<1024?file.Length+" B":(file.Length/1024d).ToString("N1")+" KB");}catch{row.SubItems.Add("");}row.Tag=file.FullName;fileList.Items.Add(row);}fileList.EndUpdate();currentFolder=full;address.Text=full;fileStatus.Text=folders.Length+" folders · "+files.Length+" files";
+  fileList.BeginUpdate();fileList.Items.Clear();foreach(var folder in folders){if((folder.Attributes&FileAttributes.Hidden)!=0)continue;var row=new ListViewItem(folder.Name);row.SubItems.Add("Folder");row.SubItems.Add("");row.Tag=folder.FullName;fileList.Items.Add(row);}foreach(var file in files){if((file.Attributes&FileAttributes.Hidden)!=0)continue;var row=new ListViewItem(file.Name);row.SubItems.Add(file.Extension.Length==0?"File":file.Extension);try{row.SubItems.Add(file.Length<1024?file.Length+" B":(file.Length/1024d).ToString("N1")+" KB");}catch{row.SubItems.Add("");}row.Tag=file.FullName;fileList.Items.Add(row);}int folderCount=0,fileCount=0;foreach(ListViewItem item in fileList.Items){if(item.SubItems[1].Text=="Folder")folderCount++;else fileCount++;}fileList.EndUpdate();currentFolder=full;address.Text=full;fileStatus.Text=folderCount+" folders · "+fileCount+" files";
  }catch(Exception e){fileList.EndUpdate();fileStatus.Text="Cannot open folder: "+e.Message;}}
  void OpenFileSelection(){if(fileList.SelectedItems.Count==0)return;string path=fileList.SelectedItems[0].Tag as string;if(Directory.Exists(path))BrowseFolder(path);else OpenPath(path);}
  void OpenPath(string path){try{if(!string.IsNullOrEmpty(path))Process.Start(new ProcessStartInfo(path){UseShellExecute=true});}catch(Exception e){MessageBox.Show(this,e.Message,"Unable to open",MessageBoxButtons.OK,MessageBoxIcon.Information);}}

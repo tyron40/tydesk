@@ -51,11 +51,11 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item 'calculator-dist/System Calculator.exe' 'downloads/System Calculator.exe' -Force
-          @{version='1.8';architecture='windows-x64';self_contained=$true;windows_smoke_test=$true;source_commit=(git rev-parse HEAD)} | ConvertTo-Json | Set-Content downloads/system-calculator-build.json
+          @{version='1.9';architecture='windows-x64';self_contained=$true;windows_smoke_test=$true;source_commit=(git rev-parse HEAD)} | ConvertTo-Json | Set-Content downloads/system-calculator-build.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add 'downloads/System Calculator.exe' downloads/system-calculator-build.json
-          git commit -m 'Publish Windows-tested standalone System Calculator 1.8'
+          git commit -m 'Publish Windows-tested standalone System Calculator 1.9'
           if ($LASTEXITCODE -ne 0) { throw 'Could not commit calculator build' }
           git pull --rebase origin main
           if ($LASTEXITCODE -ne 0) { throw 'Could not synchronize calculator build' }
@@ -67,15 +67,15 @@ jobs:
           $ready = $false
           for ($attempt = 0; $attempt -lt 90; $attempt++) {
             try {
-              $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=1.8'
+              $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=1.9'
               $calculator = $info.platforms | Where-Object { $_.id -eq 'system-calculator' }
-              if ($calculator.version -eq '1.8') { $ready = $true; break }
+              if ($calculator.version -eq '1.9') { $ready = $true; break }
             } catch { Write-Host 'Waiting for website deployment' }
             Start-Sleep -Seconds 10
           }
-          if (-not $ready) { throw 'Website did not deploy calculator version 1.8' }
+          if (-not $ready) { throw 'Website did not deploy calculator version 1.9' }
           New-Item -ItemType Directory -Force website-check | Out-Null
-          Invoke-WebRequest 'https://zdesk-nnym.onrender.com/download/system-calculator?v=1.8' -OutFile 'website-check/System Calculator.exe'
+          Invoke-WebRequest 'https://zdesk-nnym.onrender.com/download/system-calculator?v=1.9' -OutFile 'website-check/System Calculator.exe'
           & .\CalculatorSmoke.exe 'website-check/System Calculator.exe' --launch-only
           if ($LASTEXITCODE -ne 0) { throw 'Actual website download did not open correctly' }
           & .\CalculatorSmoke.exe 'website-check/System Calculator.exe'
