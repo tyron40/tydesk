@@ -1,0 +1,62 @@
+name: Build and test System Calculator on Windows
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - calculator/**
+      - .github/workflows/calculator-app.yml
+permissions:
+  contents: write
+concurrency:
+  group: system-calculator
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          sparse-checkout: |
+            calculator
+            downloads
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build standalone Windows app with runtime included
+        shell: pwsh
+        run: |
+          dotnet publish calculator/SystemCalculator.csproj -c Release -o calculator-dist
+          if ($LASTEXITCODE -ne 0) { throw 'Calculator publish failed' }
+          if ((Get-Item 'calculator-dist/System Calculator.exe').Length -gt 95MB) { throw 'Executable exceeds repository size limit' }
+      - name: Test downloaded executable on Windows
+        shell: pwsh
+        run: |
+          $compiler = "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+          & $compiler /nologo /target:exe /out:CalculatorSmoke.exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll calculator/WindowsSmoke.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Smoke test driver did not compile' }
+          & .\CalculatorSmoke.exe 'calculator-dist/System Calculator.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Windows calculator interaction tests failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calculator-windows-test
+          path: |
+            calculator-windows-smoke.json
+            ~/AppData/Local/CalculatorVault/startup-error.log
+      - name: Publish tested download
+        shell: pwsh
+        run: |
+          Copy-Item 'calculator-dist/System Calculator.exe' 'downloads/System Calculator.exe' -Force
+          @{version='1.4';architecture='windows-x64';self_contained=$true;windows_smoke_test=$true;source_commit=(git rev-parse HEAD)} | ConvertTo-Json | Set-Content downloads/system-calculator-build.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add 'downloads/System Calculator.exe' downloads/system-calculator-build.json
+          git commit -m 'Publish Windows-tested standalone System Calculator 1.4'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not commit calculator build' }
+          git pull --rebase origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not synchronize calculator build' }
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish calculator build' }

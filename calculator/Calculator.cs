@@ -42,16 +42,28 @@ static class Program {
   }}catch{return null;}
  }
  public static void Recover(){foreach(Entry e in Load())if(e.Valid())Native.ShowWindowAsync(new IntPtr(e.Handle),9);}
+ public static void Report(Exception error){
+  string path=Path.Combine(Dir,"startup-error.log");
+  try{Directory.CreateDirectory(Dir);File.WriteAllText(path,DateTime.UtcNow.ToString("O")+Environment.NewLine+error);}catch{}
+  try{MessageBox.Show("System Calculator could not start.\n\n"+error.Message+"\n\nDetails: "+path,"System Calculator",MessageBoxButtons.OK,MessageBoxIcon.Error);}catch{}
+ }
  [STAThread] public static void Main(string[] args){
+  try{Run(args);}catch(Exception error){Report(error);}
+ }
+ static void Run(string[] args){
   Directory.CreateDirectory(Dir);
   if(args.Length==2 && args[0]=="/watch") {try{Process.GetProcessById(int.Parse(args[1])).WaitForExit();}catch{}Recover();return;}
   if(args.Length==1 && args[0]=="/restore"){Recover();return;}
+  Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+  Application.ThreadException+=delegate(object sender,ThreadExceptionEventArgs e){Report(e.Exception);};
+  AppDomain.CurrentDomain.UnhandledException+=delegate(object sender,UnhandledExceptionEventArgs e){Report(e.ExceptionObject as Exception??new Exception("Unhandled startup error"));};
   bool first; using(var mutex=new Mutex(true,"Local\\CalculatorVault_Tyron_v1",out first)){
    if(!first){MessageBox.Show("System Calculator is already running. Use Ctrl+Alt+F12 to restore hidden windows.");return;}
    Recover();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
-   try{Application.Run(new Calculator());}catch(Exception e){MessageBox.Show("System Calculator closed: "+e.Message);}finally{Recover();}
+   try{Application.Run(new Calculator());}finally{Recover();}
   }
  }
+
 }
 class Calculator:Form {
  TextBox display=new TextBox(); Panel calc=new Panel(),vault=new Panel(); ListBox visible=new ListBox(),hidden=new ListBox();
@@ -59,7 +71,7 @@ class Calculator:Form {
  List<Entry> entries=new List<Entry>(); string input=""; string pinPath=Path.Combine(Program.Dir,"pin.dat");
  DateTime retry=DateTime.MinValue; int attempts=0; bool hotkey=false; Process watcher;
  public Calculator(){
-  Text="System Calculator";Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);ClientSize=new Size(400,540);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
+  Text="System Calculator";try{Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{Icon=SystemIcons.Application;}ClientSize=new Size(400,540);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
   BackColor=Color.FromArgb(28,30,35);ForeColor=Color.White;Font=new Font("Segoe UI",11);
   calc.Dock=DockStyle.Fill;vault.Dock=DockStyle.Fill;Controls.Add(calc);Controls.Add(vault);vault.Visible=false;
   display.ReadOnly=true;display.Text="0";display.TextAlign=HorizontalAlignment.Right;display.Font=new Font("Segoe UI",28);display.SetBounds(16,25,368,65);calc.Controls.Add(display);
@@ -75,7 +87,7 @@ class Calculator:Form {
   vault.Controls.Add(new Label{Text="Emergency restore: Ctrl + Alt + F12",Location=new Point(16,510),AutoSize=true,Font=new Font("Segoe UI",9)});
   var idle=new System.Windows.Forms.Timer{Interval=60000};idle.Tick+=delegate{if(vault.Visible)Lock();};idle.Start();
   Shown+=delegate{
-   hotkey=Native.RegisterHotKey(Handle,1,0x4003,0x7B);
+   try{hotkey=Native.RegisterHotKey(Handle,1,0x4003,0x7B);}catch{hotkey=false;}
    try{watcher=Process.Start(new ProcessStartInfo(Application.ExecutablePath,"/watch "+Process.GetCurrentProcess().Id){UseShellExecute=false,CreateNoWindow=true});}catch{}
   };
   KeyPreview=true;
