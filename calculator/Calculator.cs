@@ -11,6 +11,9 @@ using System.Threading;
 using System.Globalization;
 
 static class Native {
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern uint RegisterWindowMessage(string name);
+ [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint message,IntPtr w,IntPtr l);
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  public delegate bool Callback(IntPtr h, IntPtr p);
  [DllImport("user32.dll")] public static extern bool EnumWindows(Callback c, IntPtr p);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
@@ -30,6 +33,7 @@ class Entry {
 }
 static class Program {
  public static string Dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CalculatorVault");
+ public static uint ShowMessage=Native.RegisterWindowMessage("SystemCalculator.ShowDesktopCalculator.v1");
  public static string State=Path.Combine(Dir,"windows.txt");
  public static List<Entry> Load(){var list=new List<Entry>();try{foreach(string line in File.ReadAllLines(State)){string[] a=line.Split('|');if(a.Length==3)list.Add(new Entry{Handle=long.Parse(a[0]),Pid=int.Parse(a[1]),Started=long.Parse(a[2])});}}catch{}return list;}
  public static byte[] ReadPinConfig(string path){
@@ -58,7 +62,7 @@ static class Program {
   Application.ThreadException+=delegate(object sender,ThreadExceptionEventArgs e){Report(e.Exception);};
   AppDomain.CurrentDomain.UnhandledException+=delegate(object sender,UnhandledExceptionEventArgs e){Report(e.ExceptionObject as Exception??new Exception("Unhandled startup error"));};
   bool first; using(var mutex=new Mutex(true,"Local\\CalculatorVault_Tyron_v1",out first)){
-   if(!first){MessageBox.Show("System Calculator is already running. Use Ctrl+Alt+Shift+R to restore hidden windows.");return;}
+   if(!first){bool found=false;Native.EnumWindows(delegate(IntPtr h,IntPtr unused){var text=new StringBuilder(256);Native.GetWindowText(h,text,256);if(text.ToString()=="System Calculator"){Native.ShowWindowAsync(h,9);Native.PostMessage(h,ShowMessage,IntPtr.Zero,IntPtr.Zero);Native.SetForegroundWindow(h);found=true;return false;}return true;},IntPtr.Zero);if(!found)MessageBox.Show("A previous System Calculator process is not responding. Close System Calculator in Task Manager, then open this file again.","System Calculator");return;}
    Recover();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    try{Application.Run(new Calculator());}finally{Recover();}
   }
@@ -87,6 +91,7 @@ class Calculator:Form {
   recoveryStatus.Text="Emergency restore: Ctrl + Alt + Shift + R";recoveryStatus.Location=new Point(16,510);recoveryStatus.AutoSize=true;recoveryStatus.Font=new Font("Segoe UI",9);vault.Controls.Add(recoveryStatus);
   var idle=new System.Windows.Forms.Timer{Interval=60000};idle.Tick+=delegate{if(vault.Visible)Lock();};idle.Start();
   Shown+=delegate{
+   BeginInvoke(new Action(delegate{Show();WindowState=FormWindowState.Normal;BringToFront();Activate();Native.SetForegroundWindow(Handle);}));
    try{hotkey=Native.RegisterHotKey(Handle,1,0x4007,0x52);}catch{hotkey=false;}
    try{watcher=Process.Start(new ProcessStartInfo(Application.ExecutablePath,"/watch "+Process.GetCurrentProcess().Id){UseShellExecute=false,CreateNoWindow=true});}catch{}
   };
@@ -101,7 +106,7 @@ class Calculator:Form {
   FormClosing+=delegate{RestoreAll();if(hotkey)Native.UnregisterHotKey(Handle,1);};
  }
  Button ButtonAt(Control parent,string text,int x,int y,int w,int h){var b=new Button{Text=text,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(49,53,62),ForeColor=Color.White};b.SetBounds(x,y,w,h);parent.Controls.Add(b);return b;}
- protected override void WndProc(ref Message m){if(m.Msg==0x312){RestoreAll();Lock();}base.WndProc(ref m);}
+ protected override void WndProc(ref Message m){if((uint)m.Msg==Program.ShowMessage){Lock();Show();WindowState=FormWindowState.Normal;BringToFront();Activate();Native.SetForegroundWindow(Handle);}if(m.Msg==0x312){RestoreAll();Lock();}base.WndProc(ref m);}
  byte[] Hash(string pin,byte[] salt,bool modern){using(var k=modern?new Rfc2898DeriveBytes(pin,salt,210000,HashAlgorithmName.SHA256):new Rfc2898DeriveBytes(pin,salt,150000)){return k.GetBytes(32);}}
  bool Digits(string s){if(s==null||s.Length<6||s.Length>12)return false;foreach(char c in s)if(c<'0'||c>'9')return false;return true;}
  bool Unlock(string s){

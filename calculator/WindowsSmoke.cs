@@ -31,15 +31,17 @@ class WindowsSmoke {
   Process app=null;Form target=null;
   try{
    string source=Path.GetFullPath(args[0]);string configured=Path.Combine(Path.GetDirectoryName(source),"Configured Calculator Test.exe");
+   bool launchOnly=args.Length>1&&args[1]=="--launch-only";
    byte[] binary=File.ReadAllBytes(source),salt=new byte[16];for(int i=0;i<16;i++)salt[i]=(byte)i;
    byte[] hash;using(var k=new Rfc2898DeriveBytes("072839",salt,210000,HashAlgorithmName.SHA256))hash=k.GetBytes(32);
-   using(var output=File.Create(configured)){output.Write(binary,0,binary.Length);output.Write(salt,0,salt.Length);output.Write(hash,0,hash.Length);byte[] marker=Encoding.ASCII.GetBytes("ZDESKCALCPIN0002");output.Write(marker,0,marker.Length);}
+   if(!launchOnly)using(var output=File.Create(configured)){output.Write(binary,0,binary.Length);output.Write(salt,0,salt.Length);output.Write(hash,0,hash.Length);byte[] marker=Encoding.ASCII.GetBytes("ZDESKCALCPIN0002");output.Write(marker,0,marker.Length);}
    Application.EnableVisualStyles();target=new Form{Text="Calculator Windows smoke target",Width=360,Height=200};target.Show();Application.DoEvents();
-   app=Process.Start(new ProcessStartInfo(configured){UseShellExecute=false});IntPtr window=IntPtr.Zero;
+   app=Process.Start(new ProcessStartInfo(launchOnly?source:configured){UseShellExecute=launchOnly});IntPtr window=IntPtr.Zero;
    Wait(delegate{app.Refresh();if(app.HasExited)throw new Exception("Calculator exited before showing UI: "+app.ExitCode);window=app.MainWindowHandle;return window!=IntPtr.Zero&&IsWindowVisible(window);},"Calculator never showed a window",45);
    if(Text(window)!="System Calculator")throw new Exception("Unexpected startup window: "+Text(window));
    if(!HasLabel(window,"Standard")||HasLabel(window,"Private window panel"))throw new Exception("Startup is not a plain calculator");
    Console.WriteLine("CHECK: arithmetic");Click(window,"2");Click(window,"+");Click(window,"2");Click(window,"=");if(Display(window)!="4")throw new Exception("2+2 did not produce 4: "+Display(window));
+   if(launchOnly){app.CloseMainWindow();app.WaitForExit(5000);Console.WriteLine("PASS: exact website-downloaded executable opened a desktop calculator and calculated 2+2=4.");return 0;}
    Console.WriteLine("CHECK: configured password");Click(window,"C");foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");
    Wait(()=>HasLabel(window,"Private window panel"),"PIN from appended download configuration did not unlock the panel");
    Console.WriteLine("CHECK: hide and restore");SelectTarget(window,target.Text);Click(window,"Hide selected");Wait(()=>!IsWindowVisible(target.Handle),"Hide selected did not hide the test window");
