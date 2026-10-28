@@ -1,3 +1,7 @@
 {
-  "version": "1.3"
+  "architecture": "windows-x64",
+  "source_commit": "77ffb0ebe2dd594eaf744da6e42f3a19c5c64625",
+  "version": "1.4",
+  "self_contained": true,
+  "windows_smoke_test": true
 }
