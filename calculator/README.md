@@ -1,8 +1,22 @@
-# System Calculator 1.4
+# System Calculator 1.7
 
 Open System Calculator.exe on 64-bit Windows 10/11. The published single EXE
 includes its .NET runtime; no separate .NET installation is needed.
-It starts as a regular calculator without PIN setup dialogs. Keyboard input works.
+It starts as a scientific calculator without PIN setup dialogs. Keyboard input works.
+Scientific functions include degrees/radians, trigonometry, square root, powers,
+logarithms, factorial, reciprocal, constants and parentheses. Unary function
+buttons act on the current expression; x^y inserts a power operator.
+
+After password + equals, the redesigned private dashboard contains:
+- Windows: hide and restore running windows.
+- Files: drives, Home/Desktop/Documents/Downloads shortcuts, editable folder path,
+  parent navigation, double-click/open selected and Open in Explorer.
+- Apps: searchable Start menu programs, launch selected, browse for an executable,
+  and All Windows apps (the Windows applications folder, including Store apps).
+
+File access follows the current Windows account permissions. Files open in their
+default app. Browsing does not move, encrypt or hide files or installed programs.
+The app browser launches programs normally; Windows handles any permission prompt.
 
 Set your calculator password once in the private ZDesk dashboard. The backend
 saves only a salted PBKDF2-HMAC-SHA256 verifier (210,000 iterations). All future

@@ -9,7 +9,7 @@ if not exist "%compiler%" (
  exit /b 1
 )
 if not exist "System Calculator.exe" (
- "%compiler%" /nologo /target:winexe /out:"System Calculator.exe" /win32icon:calculator.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Security.dll Calculator.cs
+ "%compiler%" /nologo /target:winexe /out:"System Calculator.exe" /win32icon:calculator.ico /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Security.dll Calculator.cs Dashboard.cs
  if errorlevel 1 (
   echo Build failed. Keep all extracted files together in a writable folder.
   pause

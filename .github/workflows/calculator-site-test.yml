@@ -23,10 +23,10 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force website-check | Out-Null
-          $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=1.6-checked'
+          $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=1.7-checked'
           $app = $info.platforms | Where-Object { $_.id -eq 'system-calculator' }
-          if ($app.version -ne '1.6') { throw 'Website is not serving version 1.6' }
-          Invoke-WebRequest 'https://zdesk-nnym.onrender.com/download/system-calculator?v=1.6-checked' -OutFile 'website-check/System Calculator.exe'
+          if ($app.version -ne '1.7') { throw 'Website is not serving version 1.7' }
+          Invoke-WebRequest 'https://zdesk-nnym.onrender.com/download/system-calculator?v=1.7-checked' -OutFile 'website-check/System Calculator.exe'
           & .\CalculatorSmoke.exe 'website-check/System Calculator.exe' --launch-only
           if ($LASTEXITCODE -ne 0) { throw 'Desktop calculator launch failed' }
           & .\CalculatorSmoke.exe 'website-check/System Calculator.exe'
