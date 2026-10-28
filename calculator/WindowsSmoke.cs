@@ -16,11 +16,12 @@ class WindowsSmoke {
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,IntPtr l);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h,int m,IntPtr w,StringBuilder l);
  [DllImport("user32.dll",SetLastError=true)] static extern IntPtr SendMessageTimeout(IntPtr h,uint m,IntPtr w,IntPtr l,uint flags,uint timeout,out IntPtr result);
+ [DllImport("user32.dll",SetLastError=true)] static extern bool PostMessage(IntPtr h,uint message,IntPtr w,IntPtr l);
  static string Text(IntPtr h){var s=new StringBuilder(1024);SendMessage(h,0xD,new IntPtr(s.Capacity),s);return s.ToString();}
  static string Class(IntPtr h){var s=new StringBuilder(256);GetClassName(h,s,s.Capacity);return s.ToString();}
  static void Wait(Func<bool> condition,string why,int seconds=20){var watch=Stopwatch.StartNew();while(!condition()){if(watch.Elapsed.TotalSeconds>seconds)throw new Exception(why);Application.DoEvents();Thread.Sleep(80);}Application.DoEvents();}
  static List<IntPtr> Children(IntPtr h){var children=new List<IntPtr>();EnumChildWindows(h,delegate(IntPtr x,IntPtr p){if(IsWindowVisible(x))children.Add(x);return true;},IntPtr.Zero);return children;}
- static void Click(IntPtr h,string text){foreach(var c in Children(h))if(Class(c).IndexOf("button",StringComparison.OrdinalIgnoreCase)>=0&&Text(c)==text){IntPtr ignored;if(SendMessageTimeout(c,0xF5,IntPtr.Zero,IntPtr.Zero,2,5000,out ignored)==IntPtr.Zero)throw new Exception("Button interaction timed out: "+text);Thread.Sleep(50);return;}foreach(var child in Children(h))Console.WriteLine("Visible control: "+Class(child)+" / "+Text(child));throw new Exception("Missing visible button: "+text);}
+ static void Click(IntPtr h,string text){foreach(var c in Children(h))if(Class(c).IndexOf("button",StringComparison.OrdinalIgnoreCase)>=0&&Text(c)==text){if(!PostMessage(c,0xF5,IntPtr.Zero,IntPtr.Zero))throw new Exception("Could not post button click: "+text);for(int i=0;i<5;i++){Application.DoEvents();Thread.Sleep(30);}return;}foreach(var child in Children(h))Console.WriteLine("Visible control: "+Class(child)+" / "+Text(child));throw new Exception("Missing visible button: "+text);}
  static string Display(IntPtr h){foreach(var c in Children(h))if(Class(c).IndexOf("edit",StringComparison.OrdinalIgnoreCase)>=0){var s=new StringBuilder(1024);SendMessage(c,0xD,new IntPtr(s.Capacity),s);return s.ToString();}throw new Exception("No calculator display");}
  static bool HasLabel(IntPtr h,string text){foreach(var c in Children(h))if(Text(c)==text)return true;return false;}
  static void SelectTarget(IntPtr h,string title){foreach(var c in Children(h)){if(Class(c).IndexOf("listbox",StringComparison.OrdinalIgnoreCase)<0)continue;int count=SendMessage(c,0x18B,IntPtr.Zero,IntPtr.Zero).ToInt32();for(int i=0;i<count;i++){var s=new StringBuilder(2048);SendMessage(c,0x189,new IntPtr(i),s);if(s.ToString().Contains(title)){SendMessage(c,0x186,new IntPtr(i),IntPtr.Zero);return;}}}throw new Exception("Test target window is missing from window list");}
@@ -46,7 +47,7 @@ class WindowsSmoke {
    Console.WriteLine("CHECK: crash recovery");app.Kill();app.WaitForExit();Wait(()=>IsWindowVisible(target.Handle),"Recovery monitor did not restore the test window after process termination",20);
    File.WriteAllText("calculator-windows-smoke.json","{\"ok\":true,\"startup\":true,\"arithmetic\":true,\"download_pin\":true,\"hide_restore\":true,\"lock\":true,\"crash_recovery\":true}");
    Console.WriteLine("PASS: visible calculator startup, 2+2=4, configured PIN, hide/restore, lock and crash recovery.");return 0;
-  }catch(Exception e){Console.Error.WriteLine(e);return 1;}
+  }catch(Exception e){Console.Error.WriteLine(e);try{string log=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CalculatorVault","startup-error.log");if(File.Exists(log)){File.Copy(log,"calculator-startup-error.log",true);Console.Error.WriteLine(File.ReadAllText(log));}}catch{}return 1;}
   finally{if(app!=null&&!app.HasExited){app.Kill();app.WaitForExit();}if(target!=null){target.Show();target.Close();}}
  }
 }

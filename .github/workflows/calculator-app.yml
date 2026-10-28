@@ -46,7 +46,7 @@ jobs:
           name: calculator-windows-test
           path: |
             calculator-windows-smoke.json
-            ~/AppData/Local/CalculatorVault/startup-error.log
+            calculator-startup-error.log
       - name: Publish tested download
         shell: pwsh
         run: |
