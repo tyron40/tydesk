@@ -1,7 +1,7 @@
 {
-  "self_contained": true,
-  "architecture": "windows-x64",
   "windows_smoke_test": true,
-  "source_commit": "33983688c0ba952e17e32106450d1efeb8e1bb5c",
-  "version": "1.8"
+  "source_commit": "6b77e02921269119a9afecd53e06168703fe044b",
+  "self_contained": true,
+  "version": "1.9",
+  "architecture": "windows-x64"
 }
