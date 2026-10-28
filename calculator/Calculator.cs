@@ -112,12 +112,12 @@ partial class Calculator:Form {
    if(data.Length!=48)return false;
    byte[] salt=new byte[16];Array.Copy(data,salt,16);byte[] hash=Hash(s,salt,configuredPin!=null);
    int diff=0;for(int i=0;i<32;i++)diff|=hash[i]^data[i+16];
-   if(diff==0){attempts=0;ClientSize=new Size(1010,740);vault.Visible=true;calc.Visible=false;RefreshWindows();return true;}
+   if(diff==0){attempts=0;ClientSize=new Size(Math.Min(1010,Screen.FromControl(this).WorkingArea.Width-40),Math.Min(740,Screen.FromControl(this).WorkingArea.Height-80));vault.Visible=true;calc.Visible=false;RefreshWindows();return true;}
    if(++attempts>=5){retry=DateTime.UtcNow.AddSeconds(30);attempts=0;}
   }catch{}return false;
  }
  void Press(string k){
-  bool number=k.Length==1&&((k[0]>='0'&&k[0]<='9')||k==".");
+  bool number=k=="("||k.Length==1&&((k[0]>='0'&&k[0]<='9')||k==".");
   if(number&&resultShown){input="";resultShown=false;}
   if(Scientific(k))return;
   if(k=="x^y")k="^";

@@ -22,7 +22,7 @@ partial class Calculator {
   ButtonAt(side,"PIN settings",18,580,154,42).Click+=delegate{OpenPath("https://zdesk-nnym.onrender.com/#calculator-settings");};
   ButtonAt(side,"Lock",18,640,154,48).Click+=delegate{Lock();};
   var body=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24)};vault.Controls.Add(body);body.BringToFront();
-  foreach(var page in new[]{windowsPage,filesPage,appsPage}){page.Dock=DockStyle.Fill;body.Controls.Add(page);}
+  foreach(var page in new[]{windowsPage,filesPage,appsPage}){page.Dock=DockStyle.Fill;page.AutoScroll=true;page.AutoScrollMinSize=new Size(748,670);body.Controls.Add(page);}
   Caption(windowsPage,"Private window panel",0,0,24);Caption(windowsPage,"Keep your workspace focused. Restore windows at any time.",0,48,10);
   Caption(windowsPage,"RUNNING WINDOWS",0,95,9);visible.SetBounds(0,122,748,160);StyleList(visible);windowsPage.Controls.Add(visible);
   ButtonAt(windowsPage,"Refresh",0,294,130,42).Click+=delegate{RefreshWindows();};ButtonAt(windowsPage,"Hide selected",142,294,180,42).Click+=delegate{HideSelected();};
