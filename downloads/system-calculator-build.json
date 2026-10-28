@@ -1,7 +1,7 @@
 {
+  "source_commit": "7371007b14297a336892165f047664b68b76f649",
+  "version": "1.5",
+  "windows_smoke_test": true,
   "architecture": "windows-x64",
-  "source_commit": "77ffb0ebe2dd594eaf744da6e42f3a19c5c64625",
-  "version": "1.4",
-  "self_contained": true,
-  "windows_smoke_test": true
+  "self_contained": true
 }
