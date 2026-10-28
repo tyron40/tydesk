@@ -72,7 +72,7 @@ static class Program {
 class Calculator:Form {
  TextBox display=new TextBox(); Panel calc=new Panel(),vault=new Panel(); ListBox visible=new ListBox(),hidden=new ListBox(); Label recoveryStatus=new Label();
  byte[] configuredPin=Program.ReadPinConfig(Application.ExecutablePath);
- List<Entry> entries=new List<Entry>(); string input=""; string pinPath=Path.Combine(Program.Dir,"pin.dat");
+ List<Entry> entries=new List<Entry>(); bool resultShown=false; string input=""; string pinPath=Path.Combine(Program.Dir,"pin.dat");
  DateTime retry=DateTime.MinValue; int attempts=0; bool hotkey=false; Process watcher;
  public Calculator(){
   Text="System Calculator";try{Icon=Icon.ExtractAssociatedIcon(Application.ExecutablePath);}catch{Icon=SystemIcons.Application;}ClientSize=new Size(400,540);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
@@ -120,13 +120,26 @@ class Calculator:Form {
    if(++attempts>=5){retry=DateTime.UtcNow.AddSeconds(30);attempts=0;}
   }catch{}return false;
  }
- void Press(string k){if(k=="C")input="";else if(k=="DEL"){if(input.Length>0)input=input.Substring(0,input.Length-1);}else if(k=="="){if(Unlock(input)){input="";display.Text="0";return;}try{input=Evaluate(input).ToString("G15",CultureInfo.InvariantCulture);}catch{input="";display.Text="Error";return;}}else if(k=="+/-"){if(input.StartsWith("-"))input=input.Substring(1);else input="-"+input;}else if(k=="%") {try{input=(Evaluate(input)/100).ToString("G15",CultureInfo.InvariantCulture);}catch{input="";}}else if(input.Length<80)input+=k;display.Text=input.Length==0?"0":input;}
+ void Press(string k){
+  bool number=k.Length==1&&((k[0]>='0'&&k[0]<='9')||k==".");
+  if(number&&resultShown){input="";resultShown=false;}
+  if(k=="C"){input="";resultShown=false;}
+  else if(k=="DEL"){if(input.Length>0)input=input.Substring(0,input.Length-1);resultShown=false;}
+  else if(k=="="){
+   if(Unlock(input)){input="";resultShown=false;display.Text="0";return;}
+   try{input=Evaluate(input).ToString("G15",CultureInfo.InvariantCulture);resultShown=true;}
+   catch{input="";resultShown=true;display.Text="Error";return;}
+  }else if(k=="+/-"){if(input.StartsWith("-"))input=input.Substring(1);else input="-"+input;}
+  else if(k=="%") {try{input=(Evaluate(input)/100).ToString("G15",CultureInfo.InvariantCulture);resultShown=true;}catch{input="";resultShown=true;}}
+  else if(input.Length<80){input+=k;resultShown=false;}
+  display.Text=input.Length==0?"0":input;
+ }
  // Arithmetic parser: parentheses are internal only; no code evaluation.
  double Evaluate(string s){int p=0;double v=Expr(s,ref p);if(p!=s.Length||double.IsNaN(v)||double.IsInfinity(v))throw new Exception();return v;}
  double Expr(string s,ref int p){double v=Term(s,ref p);while(p<s.Length&&(s[p]=='+'||s[p]=='-')){char op=s[p++];double b=Term(s,ref p);v=op=='+'?v+b:v-b;}return v;}
  double Term(string s,ref int p){double v=Number(s,ref p);while(p<s.Length&&(s[p]=='*'||s[p]=='/')){char op=s[p++];double b=Number(s,ref p);v=op=='*'?v*b:v/b;}return v;}
  double Number(string s,ref int p){int start=p;if(p<s.Length&&(s[p]=='+'||s[p]=='-'))p++;while(p<s.Length&&(char.IsDigit(s[p])||s[p]=='.'))p++;if(p<s.Length&&(s[p]=='E'||s[p]=='e')){p++;if(p<s.Length&&(s[p]=='+'||s[p]=='-'))p++;while(p<s.Length&&char.IsDigit(s[p]))p++;}return double.Parse(s.Substring(start,p-start),CultureInfo.InvariantCulture);}
- void Lock(){vault.Visible=false;calc.Visible=true;input="";display.Text="0";}
+ void Lock(){vault.Visible=false;calc.Visible=true;input="";resultShown=false;display.Text="0";}
  void RefreshWindows(){visible.SelectedIndex=-1;visible.Items.Clear();Native.EnumWindows(delegate(IntPtr h,IntPtr unused){uint pid;Native.GetWindowThreadProcessId(h,out pid);if(pid==Process.GetCurrentProcess().Id||!Native.IsWindowVisible(h))return true;var title=new StringBuilder(512);Native.GetWindowText(h,title,512);var cls=new StringBuilder(128);Native.GetClassName(h,cls,128);if(title.Length==0||cls.ToString()=="Shell_TrayWnd"||cls.ToString()=="Progman"||cls.ToString()=="WorkerW")return true;try{var process=Process.GetProcessById((int)pid);visible.Items.Add(new Entry{Handle=h.ToInt64(),Pid=(int)pid,Started=process.StartTime.ToUniversalTime().Ticks,Title=process.ProcessName+" - "+title});}catch{}return true;},IntPtr.Zero);SyncHidden();}
  void Save(){string tmp=Program.State+".tmp";var lines=new List<string>();foreach(Entry e in entries)lines.Add(e.Line());File.WriteAllLines(tmp,lines.ToArray());if(File.Exists(Program.State))File.Replace(tmp,Program.State,null);else File.Move(tmp,Program.State);}
  void SyncHidden(){hidden.SelectedIndex=-1;hidden.Items.Clear();foreach(Entry e in entries)hidden.Items.Add(e);}

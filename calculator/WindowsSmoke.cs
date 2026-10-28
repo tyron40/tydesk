@@ -42,7 +42,7 @@ class WindowsSmoke {
    if(!HasLabel(window,"Standard")||HasLabel(window,"Private window panel"))throw new Exception("Startup is not a plain calculator");
    Console.WriteLine("CHECK: arithmetic");Click(window,"2");Click(window,"+");Click(window,"2");Click(window,"=");if(Display(window)!="4")throw new Exception("2+2 did not produce 4: "+Display(window));
    if(launchOnly){app.CloseMainWindow();app.WaitForExit(5000);Console.WriteLine("PASS: exact website-downloaded executable opened a desktop calculator and calculated 2+2=4.");return 0;}
-   Console.WriteLine("CHECK: configured password");Click(window,"C");foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");
+   Console.WriteLine("CHECK: password immediately after calculation, without clearing");foreach(char c in "072839")Click(window,c.ToString());Click(window,"=");
    Wait(()=>HasLabel(window,"Private window panel"),"PIN from appended download configuration did not unlock the panel");
    Console.WriteLine("CHECK: hide and restore");SelectTarget(window,target.Text);Click(window,"Hide selected");Wait(()=>!IsWindowVisible(target.Handle),"Hide selected did not hide the test window");
    Click(window,"Restore all");Wait(()=>IsWindowVisible(target.Handle),"Restore all did not restore the test window");
