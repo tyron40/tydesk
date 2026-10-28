@@ -58,7 +58,7 @@ static class Program {
   Application.ThreadException+=delegate(object sender,ThreadExceptionEventArgs e){Report(e.Exception);};
   AppDomain.CurrentDomain.UnhandledException+=delegate(object sender,UnhandledExceptionEventArgs e){Report(e.ExceptionObject as Exception??new Exception("Unhandled startup error"));};
   bool first; using(var mutex=new Mutex(true,"Local\\CalculatorVault_Tyron_v1",out first)){
-   if(!first){MessageBox.Show("System Calculator is already running. Use Ctrl+Alt+F12 to restore hidden windows.");return;}
+   if(!first){MessageBox.Show("System Calculator is already running. Use Ctrl+Alt+Shift+R to restore hidden windows.");return;}
    Recover();Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
    try{Application.Run(new Calculator());}finally{Recover();}
   }
@@ -66,7 +66,7 @@ static class Program {
 
 }
 class Calculator:Form {
- TextBox display=new TextBox(); Panel calc=new Panel(),vault=new Panel(); ListBox visible=new ListBox(),hidden=new ListBox();
+ TextBox display=new TextBox(); Panel calc=new Panel(),vault=new Panel(); ListBox visible=new ListBox(),hidden=new ListBox(); Label recoveryStatus=new Label();
  byte[] configuredPin=Program.ReadPinConfig(Application.ExecutablePath);
  List<Entry> entries=new List<Entry>(); string input=""; string pinPath=Path.Combine(Program.Dir,"pin.dat");
  DateTime retry=DateTime.MinValue; int attempts=0; bool hotkey=false; Process watcher;
@@ -84,10 +84,10 @@ class Calculator:Form {
   vault.Controls.Add(new Label{Text="Hidden windows",Location=new Point(16,270),AutoSize=true});hidden.SetBounds(16,297,368,110);vault.Controls.Add(hidden);
   ButtonAt(vault,"Restore selected",16,415,180,38).Click+=delegate{RestoreSelected();};ButtonAt(vault,"Restore all",204,415,180,38).Click+=delegate{RestoreAll();};
   ButtonAt(vault,"Lock",16,461,112,38).Click+=delegate{Lock();};ButtonAt(vault,"PIN settings in ZDesk",138,461,246,38).Click+=delegate{try{Process.Start(new ProcessStartInfo("https://zdesk-nnym.onrender.com/#calculator-settings"){UseShellExecute=true});}catch{}};
-  vault.Controls.Add(new Label{Text="Emergency restore: Ctrl + Alt + F12",Location=new Point(16,510),AutoSize=true,Font=new Font("Segoe UI",9)});
+  recoveryStatus.Text="Emergency restore: Ctrl + Alt + Shift + R";recoveryStatus.Location=new Point(16,510);recoveryStatus.AutoSize=true;recoveryStatus.Font=new Font("Segoe UI",9);vault.Controls.Add(recoveryStatus);
   var idle=new System.Windows.Forms.Timer{Interval=60000};idle.Tick+=delegate{if(vault.Visible)Lock();};idle.Start();
   Shown+=delegate{
-   try{hotkey=Native.RegisterHotKey(Handle,1,0x4003,0x7B);}catch{hotkey=false;}
+   try{hotkey=Native.RegisterHotKey(Handle,1,0x4007,0x52);}catch{hotkey=false;}
    try{watcher=Process.Start(new ProcessStartInfo(Application.ExecutablePath,"/watch "+Process.GetCurrentProcess().Id){UseShellExecute=false,CreateNoWindow=true});}catch{}
   };
   KeyPreview=true;
@@ -125,7 +125,7 @@ class Calculator:Form {
  void RefreshWindows(){visible.Items.Clear();Native.EnumWindows(delegate(IntPtr h,IntPtr unused){uint pid;Native.GetWindowThreadProcessId(h,out pid);if(pid==Process.GetCurrentProcess().Id||!Native.IsWindowVisible(h))return true;var title=new StringBuilder(512);Native.GetWindowText(h,title,512);var cls=new StringBuilder(128);Native.GetClassName(h,cls,128);if(title.Length==0||cls.ToString()=="Shell_TrayWnd"||cls.ToString()=="Progman"||cls.ToString()=="WorkerW")return true;try{var process=Process.GetProcessById((int)pid);visible.Items.Add(new Entry{Handle=h.ToInt64(),Pid=(int)pid,Started=process.StartTime.ToUniversalTime().Ticks,Title=process.ProcessName+" - "+title});}catch{}return true;},IntPtr.Zero);SyncHidden();}
  void Save(){string tmp=Program.State+".tmp";var lines=new List<string>();foreach(Entry e in entries)lines.Add(e.Line());File.WriteAllLines(tmp,lines.ToArray());if(File.Exists(Program.State))File.Replace(tmp,Program.State,null);else File.Move(tmp,Program.State);}
  void SyncHidden(){hidden.Items.Clear();foreach(Entry e in entries)hidden.Items.Add(e);}
- void HideSelected(){if(!hotkey||watcher==null||watcher.HasExited){MessageBox.Show("Recovery protection unavailable. Restart Calculator.");return;}var e=visible.SelectedItem as Entry;if(e==null||!e.Valid())return;entries.Add(e);try{Save();}catch(Exception ex){entries.Remove(e);MessageBox.Show("Cannot save recovery information: "+ex.Message);return;}Native.ShowWindowAsync(new IntPtr(e.Handle),0);RefreshWindows();}
+ void HideSelected(){if(!hotkey||watcher==null||watcher.HasExited){recoveryStatus.Text="Hiding unavailable: shortcut or recovery monitor failed.";return;}var e=visible.SelectedItem as Entry;if(e==null||!e.Valid())return;entries.Add(e);try{Save();}catch(Exception ex){entries.Remove(e);MessageBox.Show("Cannot save recovery information: "+ex.Message);return;}Native.ShowWindowAsync(new IntPtr(e.Handle),0);RefreshWindows();}
  void RestoreSelected(){var e=hidden.SelectedItem as Entry;if(e==null)return;if(e.Valid())Native.ShowWindowAsync(new IntPtr(e.Handle),9);entries.Remove(e);try{Save();}catch{}RefreshWindows();}
  void RestoreAll(){foreach(Entry e in entries)if(e.Valid())Native.ShowWindowAsync(new IntPtr(e.Handle),9);entries.Clear();try{Save();}catch{}SyncHidden();}
 }
