@@ -10,15 +10,21 @@ partial class Calculator {
  Panel windowsPage=new Panel(),filesPage=new Panel(),appsPage=new Panel();
  TextBox address=new TextBox(),appSearch=new TextBox();
  ListView fileList=new ListView(),appList=new ListView();
- Label fileStatus=new Label(),appStatus=new Label();ComboBox drives=new ComboBox();
+ Label fileStatus=new Label(),appStatus=new Label();ComboBox drives=new ComboBox(),quickRunning=new ComboBox(),quickHidden=new ComboBox();
  string currentFolder="";bool degrees=true;Button angleButton;List<string> appPaths=new List<string>();
  Label Caption(Control parent,string text,int x,int y,int size){var l=new Label{Text=text,AutoSize=true,Location=new Point(x,y),Font=new Font("Segoe UI Semibold",size)};parent.Controls.Add(l);return l;}
  void BuildDashboard(){
-  var side=new Panel{Dock=DockStyle.Left,Width=190,BackColor=Color.FromArgb(19,29,45)};vault.Controls.Add(side);
+  var side=new Panel{Dock=DockStyle.Left,Width=190,AutoScroll=true,AutoScrollMinSize=new Size(170,710),BackColor=Color.FromArgb(19,29,45)};vault.Controls.Add(side);
   Caption(side,"S / C",24,30,24);Caption(side,"YOUR WORKSPACE",24,85,9).ForeColor=Color.FromArgb(134,157,185);
   ButtonAt(side,"Windows",18,140,154,48).Click+=delegate{ShowPage(windowsPage);RefreshWindows();};
   ButtonAt(side,"Files",18,200,154,48).Click+=delegate{ShowPage(filesPage);};
   ButtonAt(side,"Apps",18,260,154,48).Click+=delegate{ShowPage(appsPage);LoadApps();};
+  ButtonAt(side,"Refresh windows",18,315,154,30).Click+=delegate{RefreshWindows();};
+  QuickChoice(side,quickRunning,"Running window",355);
+  ButtonAt(side,"Hide window",18,392,154,36).Click+=delegate{SelectQuick(quickRunning,visible);HideSelected();};
+  QuickChoice(side,quickHidden,"Hidden window",440);
+  ButtonAt(side,"Restore window",18,477,154,36).Click+=delegate{SelectQuick(quickHidden,hidden);RestoreSelected();};
+  ButtonAt(side,"Restore all windows",18,523,154,36).Click+=delegate{RestoreAll();};
   ButtonAt(side,"PIN settings",18,580,154,42).Click+=delegate{OpenPath("https://zdesk-nnym.onrender.com/#calculator-settings");};
   ButtonAt(side,"Lock",18,640,154,48).Click+=delegate{Lock();};
   var body=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24)};vault.Controls.Add(body);body.BringToFront();
@@ -46,9 +52,22 @@ partial class Calculator {
   appStatus.SetBounds(0,636,748,30);appsPage.Controls.Add(appStatus);
   BrowseFolder(paths[0]);ShowPage(windowsPage);
  }
+ void QuickChoice(Control parent,ComboBox choice,string label,int top){
+  choice.SetBounds(18,top,154,30);choice.DropDownStyle=ComboBoxStyle.DropDownList;choice.DropDownWidth=560;choice.AccessibleName=label;choice.BackColor=Color.FromArgb(30,41,58);choice.ForeColor=ForeColor;parent.Controls.Add(choice);
+  choice.DropDown+=delegate{RefreshWindows();};
+ }
+ void SelectQuick(ComboBox choice,ListBox list){int index=choice.SelectedIndex;if(index<0||index>=choice.Items.Count){list.SelectedIndex=-1;return;}var entry=choice.Items[index] as Entry;list.SelectedIndex=-1;for(int i=0;i<list.Items.Count;i++){var candidate=list.Items[i] as Entry;if(candidate!=null&&entry!=null&&candidate.Handle==entry.Handle){list.SelectedIndex=i;break;}}}
+ void SyncQuickChoices(){
+  FillQuick(quickRunning,visible);FillQuick(quickHidden,hidden);
+ }
+ void FillQuick(ComboBox choice,ListBox source){
+  long handle=0;int oldIndex=choice.SelectedIndex;if(oldIndex>=0&&oldIndex<choice.Items.Count){var previous=choice.Items[oldIndex] as Entry;if(previous!=null)handle=previous.Handle;}
+  choice.BeginUpdate();choice.Items.Clear();int selected=-1;foreach(var item in source.Items){var entry=item as Entry;int index=choice.Items.Add(item);if(entry!=null&&entry.Handle==handle)selected=index;}
+  choice.SelectedIndex=selected>=0?selected:(choice.Items.Count>0?0:-1);choice.Enabled=choice.Items.Count>0;choice.EndUpdate();
+ }
  void StyleList(ListBox list){list.BackColor=Color.FromArgb(22,33,49);list.ForeColor=ForeColor;list.BorderStyle=BorderStyle.None;list.IntegralHeight=false;list.ItemHeight=24;}
  void SetupView(ListView view,Control parent,int top){view.SetBounds(0,top,748,365);view.View=View.Details;view.FullRowSelect=true;view.MultiSelect=false;view.HideSelection=false;view.BackColor=Color.FromArgb(22,33,49);view.ForeColor=ForeColor;view.BorderStyle=BorderStyle.None;parent.Controls.Add(view);}
- void ShowPage(Panel page){foreach(var p in new[]{windowsPage,filesPage,appsPage})p.Visible=p==page;page.BringToFront();}
+ void ShowPage(Panel page){foreach(var p in new[]{windowsPage,filesPage,appsPage})p.Visible=p==page;page.BringToFront();RefreshWindows();}
  void BrowseFolder(string path){try{
   string full=Path.GetFullPath(Environment.ExpandEnvironmentVariables(path));var directory=new DirectoryInfo(full);
   var folders=directory.GetDirectories();var files=directory.GetFiles();Array.Sort(folders,(a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Name,b.Name));Array.Sort(files,(a,b)=>StringComparer.OrdinalIgnoreCase.Compare(a.Name,b.Name));

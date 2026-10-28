@@ -1,4 +1,4 @@
-# System Calculator 1.7
+# System Calculator 1.8
 
 Open System Calculator.exe on 64-bit Windows 10/11. The published single EXE
 includes its .NET runtime; no separate .NET installation is needed.
@@ -9,6 +9,8 @@ buttons act on the current expression; x^y inserts a power operator.
 
 After password + equals, the redesigned private dashboard contains:
 - Windows: hide and restore running windows.
+- Persistent sidebar: running/hidden window selectors, Refresh windows, Hide window,
+  Restore window and Restore all windows stay available on Files and Apps pages.
 - Files: drives, Home/Desktop/Documents/Downloads shortcuts, editable folder path,
   parent navigation, double-click/open selected and Open in Explorer.
 - Apps: searchable Start menu programs, launch selected, browse for an executable,
