@@ -1,0 +1,33 @@
+name: Verify live calculator download on Windows
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/calculator-site-test.yml]
+permissions:
+  contents: read
+jobs:
+  website:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: calculator
+      - name: Compile Windows UI test driver
+        shell: pwsh
+        run: |
+          $source = (Resolve-Path 'calculator/WindowsSmoke.cs').Path
+          & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /out:CalculatorSmoke.exe /reference:System.Windows.Forms.dll /reference:System.Drawing.dll $source
+          if ($LASTEXITCODE -ne 0) { throw 'Test compilation failed' }
+      - name: Check actual live website app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force website-check | Out-Null
+          $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=1.6-checked'
+          $app = $info.platforms | Where-Object { $_.id -eq 'system-calculator' }
+          if ($app.version -ne '1.6') { throw 'Website is not serving version 1.6' }
+          Invoke-WebRequest 'https://zdesk-nnym.onrender.com/download/system-calculator?v=1.6-checked' -OutFile 'website-check/System Calculator.exe'
+          & .\CalculatorSmoke.exe 'website-check/System Calculator.exe' --launch-only
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop calculator launch failed' }
+          & .\CalculatorSmoke.exe 'website-check/System Calculator.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Password or hide/restore tests failed' }
