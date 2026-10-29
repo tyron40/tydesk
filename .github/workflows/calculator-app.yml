@@ -64,12 +64,13 @@ jobs:
       - name: Verify exact website download opens as desktop calculator
         shell: pwsh
         run: |
+          $expectedSource = (Get-Content downloads/system-calculator-build.json -Raw | ConvertFrom-Json).source_commit
           $ready = $false
           for ($attempt = 0; $attempt -lt 90; $attempt++) {
             try {
               $info = Invoke-RestMethod 'https://zdesk-nnym.onrender.com/api/downloads?v=2.0'
               $calculator = $info.platforms | Where-Object { $_.id -eq 'system-calculator' }
-              if ($calculator.version -eq '2.0') { $ready = $true; break }
+              if ($calculator.version -eq '2.0' -and $calculator.source_commit -eq $expectedSource) { $ready = $true; break }
             } catch { Write-Host 'Waiting for website deployment' }
             Start-Sleep -Seconds 10
           }
