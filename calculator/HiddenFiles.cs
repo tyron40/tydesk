@@ -28,7 +28,7 @@ partial class Calculator {
     SaveVault();
    }
    // A successful atomic restore may have completed before the index was updated.
-   bool changed=false;foreach(var item in new List<VaultItem>(vaultItems))if(item.State=="Restoring"&&!PathExists(item.Stored)&&PathExists(item.Original)){vaultItems.Remove(item);changed=true;}if(changed)SaveVault();
+   bool changed=false;foreach(var item in new List<VaultItem>(vaultItems))if(item.State=="Restoring"&&!PathExists(item.Stored)&&PathExists(item.Original)){try{EnsureRestoredAttributes(item);vaultItems.Remove(item);changed=true;}catch{}}if(changed)SaveVault();
   }catch(Exception e){vaultReadError="Hidden item index could not be read: "+e.Message;}
   Caption(hiddenFilesPage,"Hidden files/apps",0,0,24);Caption(hiddenFilesPage,"Moved items are removed from their original folders. Restore them below.",0,48,10);
   Caption(hiddenFilesPage,"App shortcuts can be hidden; installed programs remain installed. Storage is not encrypted.",0,73,9);
@@ -69,7 +69,7 @@ partial class Calculator {
   bool folder=(attrs&FileAttributes.Directory)!=0;
   string root=StorageRoot(path);if(Within(path,root)||Within(root,path))throw new IOException("Calculator storage cannot be hidden again.");
   var item=legacy??new VaultItem{Id=Guid.NewGuid().ToString("N"),Original=path,Kind=kind??(folder?"Folder":"File"),Attributes=(int)attrs};
-  bool wasLegacy=item.Legacy;
+  bool wasLegacy=item.Legacy;if(wasLegacy)item.Attributes=(int)(attrs&~FileAttributes.Hidden);
   string bucket=Path.Combine(root,item.Id);Directory.CreateDirectory(bucket);item.Stored=Path.Combine(bucket,Path.GetFileName(path));item.Legacy=false;item.State="Pending";
   if(legacy==null)vaultItems.Add(item);
   try{SaveVault();}catch{if(legacy==null)vaultItems.Remove(item);else{item.Legacy=wasLegacy;item.State="Legacy";item.Stored="";}throw;}
@@ -111,19 +111,20 @@ partial class Calculator {
   }hiddenFileList.EndUpdate();hiddenFileStatus.Text=vaultReadError.Length>0?vaultReadError:vaultItems.Count+" hidden items";
  }
  void OpenHiddenSelection(){var selected=SelectedVault();if(selected.Count==0)return;var item=selected[0];OpenPath(item.Legacy?item.Original:item.Stored);}
+ void EnsureRestoredAttributes(VaultItem item){FileAttributes attrs=File.GetAttributes(item.Original);if((item.Attributes&(int)FileAttributes.Hidden)==0&&(attrs&FileAttributes.Hidden)!=0)File.SetAttributes(item.Original,attrs&~FileAttributes.Hidden);}
  void RestoreVault(List<VaultItem> items){
   int count=0;var errors=new List<string>();
   foreach(var item in items)try{
    if(vaultReadError.Length>0)throw new IOException(vaultReadError);
    if(item.Legacy){File.SetAttributes(item.Original,File.GetAttributes(item.Original)&~FileAttributes.Hidden);}
    else if(!PathExists(item.Stored)){
-    if(item.State!="Pending"||!PathExists(item.Original))throw new IOException("Stored item is unavailable; its recovery record has been kept.");
+    if((item.State!="Pending"&&item.State!="Restoring")||!PathExists(item.Original))throw new IOException("Stored item is unavailable; its recovery record has been kept.");if(item.State=="Restoring")EnsureRestoredAttributes(item);
    }else{
     if(PathExists(item.Original))throw new IOException("The original location is occupied. Rename or move that item first; nothing was overwritten.");
     Directory.CreateDirectory(Path.GetDirectoryName(item.Original));item.State="Restoring";SaveVault();
     MoveItem(item.Stored,item.Original,(item.Attributes&(int)FileAttributes.Directory)!=0);
     // Old attribute-only items should be visible after they are restored.
-    if((item.Attributes&(int)FileAttributes.Hidden)==0)File.SetAttributes(item.Original,File.GetAttributes(item.Original)&~FileAttributes.Hidden);
+    EnsureRestoredAttributes(item);
    }
    vaultItems.Remove(item);try{SaveVault();}catch{vaultItems.Add(item);throw;}
    if(!item.Legacy&&!string.IsNullOrEmpty(item.Stored))try{Directory.Delete(Path.GetDirectoryName(item.Stored));}catch{}
