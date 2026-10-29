@@ -16,17 +16,18 @@ partial class Calculator {
  void BuildDashboard(){
   var side=new Panel{Dock=DockStyle.Left,Width=190,AutoScroll=true,AutoScrollMinSize=new Size(170,710),BackColor=Color.FromArgb(19,29,45)};vault.Controls.Add(side);
   Caption(side,"S / C",24,30,24);Caption(side,"YOUR WORKSPACE",24,85,9).ForeColor=Color.FromArgb(134,157,185);
-  ButtonAt(side,"Windows",18,140,154,48).Click+=delegate{ShowPage(windowsPage);RefreshWindows();};
-  ButtonAt(side,"Files",18,200,154,48).Click+=delegate{ShowPage(filesPage);};
-  ButtonAt(side,"Apps",18,260,154,48).Click+=delegate{ShowPage(appsPage);LoadApps();};
-  ButtonAt(side,"Refresh windows",18,315,154,30).Click+=delegate{RefreshWindows();};
-  QuickChoice(side,quickRunning,"Running window",355);
-  ButtonAt(side,"Hide window",18,392,154,36).Click+=delegate{SelectQuick(quickRunning,visible);HideSelected();};
-  QuickChoice(side,quickHidden,"Hidden window",440);
-  ButtonAt(side,"Restore window",18,477,154,36).Click+=delegate{SelectQuick(quickHidden,hidden);RestoreSelected();};
-  ButtonAt(side,"Restore all windows",18,523,154,36).Click+=delegate{RestoreAll();};
-  ButtonAt(side,"PIN settings",18,580,154,42).Click+=delegate{OpenPath("https://zdesk-nnym.onrender.com/#calculator-settings");};
-  ButtonAt(side,"Lock",18,640,154,48).Click+=delegate{Lock();};
+  ButtonAt(side,"Windows",18,140,154,40).Click+=delegate{ShowPage(windowsPage);RefreshWindows();};
+  ButtonAt(side,"Files",18,190,154,40).Click+=delegate{ShowPage(filesPage);};
+  ButtonAt(side,"Apps",18,240,154,40).Click+=delegate{ShowPage(appsPage);LoadApps();};
+  ButtonAt(side,"Hidden files/apps",18,290,154,40).Click+=delegate{RefreshHiddenFiles();ShowPage(hiddenFilesPage);};
+  ButtonAt(side,"Refresh windows",18,340,154,30).Click+=delegate{RefreshWindows();};
+  QuickChoice(side,quickRunning,"Running window",380);
+  ButtonAt(side,"Hide window",18,419,154,36).Click+=delegate{SelectQuick(quickRunning,visible);HideSelected();};
+  QuickChoice(side,quickHidden,"Hidden window",465);
+  ButtonAt(side,"Restore window",18,504,154,36).Click+=delegate{SelectQuick(quickHidden,hidden);RestoreSelected();};
+  ButtonAt(side,"Restore all windows",18,548,154,36).Click+=delegate{RestoreAll();};
+  ButtonAt(side,"PIN settings",18,600,154,36).Click+=delegate{OpenPath("https://zdesk-nnym.onrender.com/#calculator-settings");};
+  ButtonAt(side,"Lock",18,646,154,36).Click+=delegate{Lock();};
   var body=new Panel{Dock=DockStyle.Fill,Padding=new Padding(24)};vault.Controls.Add(body);body.BringToFront();
   foreach(var page in new[]{windowsPage,filesPage,appsPage,hiddenFilesPage}){page.Dock=DockStyle.Fill;page.AutoScroll=true;page.AutoScrollMinSize=new Size(748,670);body.Controls.Add(page);}
   Caption(windowsPage,"Private window panel",0,0,24);Caption(windowsPage,"Keep your workspace focused. Restore windows at any time.",0,48,10);
@@ -35,7 +36,7 @@ partial class Calculator {
   Caption(windowsPage,"HIDDEN WINDOWS",0,358,9);hidden.SetBounds(0,384,748,140);StyleList(hidden);windowsPage.Controls.Add(hidden);
   ButtonAt(windowsPage,"Restore selected",0,536,180,42).Click+=delegate{RestoreSelected();};ButtonAt(windowsPage,"Restore all",192,536,150,42).Click+=delegate{RestoreAll();};
   recoveryStatus.Text="Emergency restore: Ctrl + Alt + Shift + R";recoveryStatus.SetBounds(0,596,748,30);recoveryStatus.ForeColor=Color.FromArgb(134,157,185);windowsPage.Controls.Add(recoveryStatus);
-  Caption(filesPage,"Your files",0,0,24);Caption(filesPage,"Hide selected files and folders, or open them in their default Windows app.",0,48,10);
+  Caption(filesPage,"Your files",0,0,24);Caption(filesPage,"Hide selected items by moving them out of their original folders.",0,48,10);
   string[] names={"Home","Desktop","Documents","Downloads"};string[] paths={Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads")};
   for(int i=0;i<names.Length;i++){string folder=paths[i];ButtonAt(filesPage,names[i],i*132,89,122,38).Click+=delegate{BrowseFolder(folder);};}
   drives.SetBounds(540,94,208,32);drives.DropDownStyle=ComboBoxStyle.DropDownList;foreach(var drive in DriveInfo.GetDrives())drives.Items.Add(drive.Name);filesPage.Controls.Add(drives);drives.SelectedIndexChanged+=delegate{if(drives.SelectedItem!=null)BrowseFolder(drives.SelectedItem.ToString());};
@@ -45,14 +46,16 @@ partial class Calculator {
   SetupView(fileList,filesPage,198);fileList.Columns.Add("Name",380);fileList.Columns.Add("Type",150);fileList.Columns.Add("Size",160);fileList.DoubleClick+=delegate{OpenFileSelection();};
   ButtonAt(filesPage,"Open selected",0,580,160,42).Click+=delegate{OpenFileSelection();};ButtonAt(filesPage,"Open in Explorer",172,580,180,42).Click+=delegate{OpenPath(currentFolder);};fileStatus.SetBounds(0,636,748,30);filesPage.Controls.Add(fileStatus);
   ButtonAt(filesPage,"Hide selected",364,580,170,42).Click+=delegate{HideFileSelection();};
-  ButtonAt(filesPage,"Hidden files",546,580,190,42).Click+=delegate{RefreshHiddenFiles();ShowPage(hiddenFilesPage);};
+  ButtonAt(filesPage,"Hidden files/apps",546,580,190,42).Click+=delegate{RefreshHiddenFiles();ShowPage(hiddenFilesPage);};
   fileList.MultiSelect=true;
   BuildHiddenFiles();
-  Caption(appsPage,"Your apps",0,0,24);Caption(appsPage,"Launch Start menu apps or browse for a program on this PC.",0,48,10);
+  Caption(appsPage,"Your apps",0,0,24);Caption(appsPage,"Launch apps or hide their shortcuts. Installed programs remain installed.",0,48,10);
   appSearch.SetBounds(0,96,440,32);appSearch.AccessibleName="Search apps";appsPage.Controls.Add(appSearch);appSearch.TextChanged+=delegate{FilterApps();};
   ButtonAt(appsPage,"Refresh apps",452,89,140,42).Click+=delegate{LoadApps();};ButtonAt(appsPage,"All Windows apps",604,89,144,42).Click+=delegate{OpenPath("shell:AppsFolder");};
   SetupView(appList,appsPage,154);appList.Height=405;appList.Columns.Add("App",350);appList.Columns.Add("Location",370);appList.DoubleClick+=delegate{LaunchSelectedApp();};
   ButtonAt(appsPage,"Launch selected",0,580,170,42).Click+=delegate{LaunchSelectedApp();};ButtonAt(appsPage,"Browse for app",182,580,170,42).Click+=delegate{using(var dialog=new OpenFileDialog{Title="Choose an app",Filter="Windows programs (*.exe;*.lnk;*.appref-ms)|*.exe;*.lnk;*.appref-ms|All files (*.*)|*.*"})if(dialog.ShowDialog(this)==DialogResult.OK)OpenPath(dialog.FileName);};
+  ButtonAt(appsPage,"Hide app shortcut",364,580,175,42).Click+=delegate{HideAppSelection();};
+  ButtonAt(appsPage,"Hidden files/apps",551,580,185,42).Click+=delegate{RefreshHiddenFiles();ShowPage(hiddenFilesPage);};
   appStatus.SetBounds(0,636,748,30);appsPage.Controls.Add(appStatus);
   BrowseFolder(paths[0]);ShowPage(windowsPage);
  }
@@ -80,7 +83,7 @@ partial class Calculator {
  void OpenFileSelection(){if(fileList.SelectedItems.Count==0)return;string path=fileList.SelectedItems[0].Tag as string;if(Directory.Exists(path))BrowseFolder(path);else OpenPath(path);}
  void OpenPath(string path){try{if(!string.IsNullOrEmpty(path))Process.Start(new ProcessStartInfo(path){UseShellExecute=true});}catch(Exception e){MessageBox.Show(this,e.Message,"Unable to open",MessageBoxButtons.OK,MessageBoxIcon.Information);}}
  void CollectApps(string folder){try{foreach(string path in Directory.GetFiles(folder)){string extension=Path.GetExtension(path).ToLowerInvariant();if(extension==".lnk"||extension==".appref-ms"||extension==".exe")appPaths.Add(path);}foreach(string child in Directory.GetDirectories(folder)){if((File.GetAttributes(child)&FileAttributes.ReparsePoint)==0)CollectApps(child);}}catch{}}
- void LoadApps(){appPaths.Clear();CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu));CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu));appPaths.Sort(StringComparer.OrdinalIgnoreCase);FilterApps();}
+ void LoadApps(){appPaths.Clear();CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu));CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu));CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));CollectApps(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory));appPaths.Sort(StringComparer.OrdinalIgnoreCase);FilterApps();}
  void FilterApps(){appList.BeginUpdate();appList.Items.Clear();foreach(string path in appPaths){string name=Path.GetFileNameWithoutExtension(path);if(name.IndexOf(appSearch.Text,StringComparison.OrdinalIgnoreCase)<0)continue;var row=new ListViewItem(name);row.SubItems.Add(Path.GetDirectoryName(path));row.Tag=path;appList.Items.Add(row);}appList.EndUpdate();appStatus.Text=appList.Items.Count+" apps · All Windows apps includes registered Store apps.";}
  void LaunchSelectedApp(){if(appList.SelectedItems.Count>0)OpenPath(appList.SelectedItems[0].Tag as string);}
  bool Scientific(string k){

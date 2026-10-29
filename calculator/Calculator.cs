@@ -32,7 +32,7 @@ class Entry {
  public string Line(){return Handle+"|"+Pid+"|"+Started;}
 }
 static class Program {
- public static string Dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CalculatorVault");
+ public static string Dir=Environment.GetEnvironmentVariable("ZDESK_CALCULATOR_DATA_DIR")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"CalculatorVault");
  public static uint ShowMessage=Native.RegisterWindowMessage("SystemCalculator.ShowDesktopCalculator.v1");
  public static string State=Path.Combine(Dir,"windows.txt");
  public static List<Entry> Load(){var list=new List<Entry>();try{foreach(string line in File.ReadAllLines(State)){string[] a=line.Split('|');if(a.Length==3)list.Add(new Entry{Handle=long.Parse(a[0]),Pid=int.Parse(a[1]),Started=long.Parse(a[2])});}}catch{}return list;}
