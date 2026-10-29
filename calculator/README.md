@@ -1,4 +1,4 @@
-# System Calculator 2.0
+# System Calculator 2.1
 
 Open System Calculator.exe on 64-bit Windows 10/11. The published single EXE
 includes its .NET runtime; no separate .NET installation is needed.
@@ -6,6 +6,8 @@ It starts as a scientific calculator without PIN setup dialogs. Keyboard input w
 Scientific functions include degrees/radians, trigonometry, square root, powers,
 logarithms, factorial, reciprocal, constants and parentheses. Unary function
 buttons act on the current expression; x^y inserts a power operator.
+
+The dashboard has no automatic timeout. Use Lock to return to calculator view.
 
 After password + equals, the redesigned private dashboard contains:
 - Windows: hide and restore running windows.

@@ -85,7 +85,6 @@ partial class Calculator:Form {
   for(int i=0;i<keys.Length;i++){string k=keys[i];var button=ButtonAt(calc,k,22+(i%6)*80,175+(i/6)*56,74,48);button.Click+=delegate{Press(k);};if(k=="DEG")angleButton=button;}
   string[] last={"C","DEL","+","="};for(int i=0;i<4;i++){string k=last[i];var button=ButtonAt(calc,k,22+i*120,533,114,62);button.Click+=delegate{Press(k);};if(k=="="){button.BackColor=Color.FromArgb(94,222,190);button.ForeColor=Color.FromArgb(10,36,32);}}
   BuildDashboard();
-  var idle=new System.Windows.Forms.Timer{Interval=60000};idle.Tick+=delegate{if(vault.Visible)Lock();};idle.Start();
   Shown+=delegate{
    BeginInvoke(new Action(delegate{Show();WindowState=FormWindowState.Normal;BringToFront();Activate();Native.SetForegroundWindow(Handle);}));
    try{hotkey=Native.RegisterHotKey(Handle,1,0x4007,0x52);}catch{hotkey=false;}
