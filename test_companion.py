@@ -93,4 +93,38 @@ class TerminalSetupTests(unittest.TestCase):
   app.connect.assert_called_once();app.save.assert_not_called()
   self.assertEqual([c.args for c in app.code.set.call_args_list],[('sample',),('',)])
 
+ def test_saved_terminal_pairing_skips_code_but_requires_connect(self):
+  secret=Mock()
+  self.assertIsNone(agent.terminal_setup(read=Mock(side_effect=['microphone','']),read_secret=secret,write=Mock(),saved=True,remember=True))
+  self.assertEqual(agent.terminal_setup(read=Mock(side_effect=['','CONNECT']),read_secret=secret,write=Mock(),saved=True,remember=True),('',set()))
+  secret.assert_not_called()
+
+ def test_terminal_pairing_saves_only_after_server_enrollment_and_forgets_on_revoke(self):
+  app=CompanionTests().app()
+  app.terminal_pairing=True;app.save=Mock();app.show=Mock()
+  issued={'id':'paired-id','token':'test-token','url':agent.DEFAULT_SERVER}
+  with patch('agent.local_settings.save_terminal') as save,patch('agent.local_settings.forget_terminal') as forget,patch('agent.local_settings.forget') as gui_forget:
+   app.events.put(('credentials',issued));app.poll();save.assert_called_once_with(issued)
+   app.events.put(('revoked','Revoked'));app.poll();forget.assert_called_once();gui_forget.assert_not_called()
+  self.assertIsNone(app.credentials)
+
+ def test_terminal_store_keeps_only_device_credential_separate_from_gui(self):
+  import tempfile,json
+  from pathlib import Path
+  from types import SimpleNamespace
+  with tempfile.TemporaryDirectory() as temp:
+   root=Path(temp)
+   gui=root/'enrollment.dat';gui.write_bytes(b'gui-store')
+   crypt=Mock()
+   crypt.CryptProtectData.return_value=b'protected-test-bytes'
+   wanted={'id':'test-id','token':'test-token','url':agent.DEFAULT_SERVER}
+   crypt.CryptUnprotectData.return_value=(None,json.dumps(wanted).encode())
+   with patch.object(agent.local_settings,'ROOT',root),patch.object(agent.local_settings,'os',SimpleNamespace(name='nt')),patch.dict(sys.modules,{'win32crypt':crypt}):
+    agent.local_settings.save_terminal({**wanted,'camera':True,'code':'test-passcode'})
+    self.assertEqual(json.loads(crypt.CryptProtectData.call_args.args[0]),wanted)
+    self.assertEqual((root/'enrollment-terminal.dat').read_bytes(),b'protected-test-bytes')
+    self.assertEqual(agent.local_settings.load_terminal(),wanted)
+    agent.local_settings.forget_terminal();self.assertIsNone(agent.local_settings.load_terminal())
+    self.assertEqual(gui.read_bytes(),b'gui-store')
+
 if __name__=='__main__':unittest.main()

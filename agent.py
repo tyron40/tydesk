@@ -10,6 +10,7 @@ import local_settings
 import remote_input
 pg.FAILSAFE=True
 pg.PAUSE=0
+DEFAULT_SERVER='https://zdesk-nnym.onrender.com'
 
 class Companion:
     def __init__(self,root,restore=True):
@@ -54,7 +55,7 @@ class Companion:
             return tk.Button(parent,text=text,command=command,bg=mint if primary else '#273a53',fg='#082b23' if primary else ink,
                 activebackground='#77eed2' if primary else '#334b69',activeforeground='#082b23' if primary else ink,
                 relief='flat',borderwidth=0,padx=15,pady=10,cursor='hand2',font=('Segoe UI',10,'bold'))
-        self.url=tk.StringVar(value='https://zdesk-nnym.onrender.com');self.code=tk.StringVar()
+        self.url=tk.StringVar(value=DEFAULT_SERVER);self.code=tk.StringVar()
         f=card('01  Connect this computer','Use a one-use code or your reusable connection passcode. Leave blank to reconnect a remembered device.')
         for label,var,secret in [('Server address',self.url,False),('Pairing code or connection passcode',self.code,True)]:
             tk.Label(f,text=label,bg=panel,fg=muted,font=('Segoe UI',9)).pack(anchor='w',pady=(4,4))
@@ -159,10 +160,16 @@ class Companion:
                 if kind=='action':getattr(self,text)();continue
                 if kind=='control_error':self.control.set(False);self.save()
                 if kind=='tray_error':self.background.set(False);self.tray=None;self.tray_ready.clear();self.show();self.save()
-                if kind=='credentials':self.credentials=text;self.code.set('');self.save();continue
+                if kind=='credentials':
+                    self.credentials=text;self.code.set('');self.save()
+                    if getattr(self,'terminal_pairing',False):
+                        try:local_settings.save_terminal(text)
+                        except Exception:
+                            self.root.after(0,lambda:messagebox.showwarning('Terminal pairing','Connected, but could not remember pairing with Windows DPAPI.'))
+                    continue
                 if kind=='uninstall':self.confirm_uninstall(text);continue
                 if kind=='revoked':
-                    self.credentials=None;local_settings.forget();self.show()
+                    self.credentials=None;self.forget_saved_pairing();self.show()
                 if kind=='done':self.show() if text.startswith('Stopped:') else None
                 self.status.set(text)
                 if kind=='done':self.running=False;self.start.config(state='normal')
@@ -306,8 +313,11 @@ class Companion:
     def disconnect(self):
         self.camera.clear();self.stop.set();self.camera_status.set('Camera stopped · Connect resumes selected permissions');self.status.set('Disconnecting…')
         if self.tray:self.tray.title='ZDesk — remote access companion'
+    def forget_saved_pairing(self):
+        if getattr(self,'terminal_pairing',False):local_settings.forget_terminal()
+        else:local_settings.forget()
     def forget(self):
-        self.disconnect();local_settings.forget();self.credentials=None;self.unattended.set(False)
+        self.disconnect();self.forget_saved_pairing();self.credentials=None;self.unattended.set(False)
         self.status.set('Enrollment forgotten. Also Revoke the device in your dashboard.')
     def close(self):
         if self.background.get():
@@ -321,7 +331,7 @@ class Companion:
         if self.tray:self.tray.stop()
         self.root.after(600,self.root.destroy)
 
-def terminal_setup(*, read, read_secret, write=print):
+def terminal_setup(*, read, read_secret, write=print, saved=False, remember=False):
     """Collect consent on the local console before starting a visible session."""
     options = {
         'control': 'mouse and keyboard control',
@@ -335,7 +345,8 @@ def terminal_setup(*, read, read_secret, write=print):
     write('ZDesk will share the primary screen with the paired dashboard.')
     for key, description in options.items():
         write(f'  {key}: {description}')
-    write('This starts a visible session. It does not save pairing or enable startup.')
+    write('This starts a visible session and does not enable startup.')
+    if remember:write('Windows will protect the saved device token. The passcode and sharing choices are not saved.')
     selection = read('Optional features (comma-separated, all, or Enter for screen only): ')
     selected = {value.strip().lower() for value in selection.split(',') if value.strip()}
     if selected == {'all'}:
@@ -343,15 +354,19 @@ def terminal_setup(*, read, read_secret, write=print):
     if not selected <= options.keys():
         raise ValueError('Unknown or unsupported sharing feature. No session started.')
     write('Selected: primary screen' + ''.join(', ' + options[key] for key in options if key in selected))
-    code = read_secret('ZDesk pairing code or connection passcode: ').strip()
-    if not code or len(code) > 200:
-        raise ValueError('Enter a valid-length ZDesk code. No session started.')
+    if saved:
+        write('Using the saved terminal pairing for this Windows account.')
+        code = ''
+    else:
+        code = read_secret('ZDesk pairing code or connection passcode: ').strip()
+        if not code or len(code) > 200:
+            raise ValueError('Enter a valid-length ZDesk code. No session started.')
     if read('Type CONNECT to start sharing, or press Enter to cancel: ') != 'CONNECT':
         return None
     return code, selected
 
 
-def connect_from_terminal(companion, code, selected):
+def connect_from_terminal(companion, code, selected, *, saved=None, remember=False):
     """Use the same permission switches and pairing path as the desktop UI."""
     switches = {
         'control': (companion.control, companion.allow),
@@ -365,6 +380,8 @@ def connect_from_terminal(companion, code, selected):
         companion.permission(var, event, persist=False)
     if 'camera' in selected:
         companion.camera_status.set('Camera selected · automatic detection when connected')
+    companion.terminal_pairing=remember
+    if saved:companion.credentials=saved
     companion.code.set(code)
     try:
         companion.connect()
@@ -412,7 +429,8 @@ if __name__=='__main__':
             sys.exit(0)
         except Exception as exc:
             output.write_text(json.dumps({'ok':False,'error':str(exc)}));sys.exit(1)
-    terminal = sys.argv[1:] == ['--terminal-setup']
+    remember_terminal = sys.argv[1:] == ['--terminal-setup','--remember-pairing']
+    terminal = sys.argv[1:] == ['--terminal-setup'] or remember_terminal
     if terminal and (getattr(sys, 'frozen', False) or not sys.stdin or not sys.stdin.isatty()):
         sys.exit('Open the Windows source launcher from an interactive PowerShell terminal.')
     # A second launch brings the existing window back from the tray.
@@ -433,10 +451,18 @@ if __name__=='__main__':
     if terminal:
         from getpass import getpass, GetPassWarning
         import warnings
+        saved_terminal = None
+        if remember_terminal:
+            try:
+                saved_terminal = local_settings.load_terminal()
+                if saved_terminal and saved_terminal['url'] != DEFAULT_SERVER:
+                    sys.exit('Saved terminal pairing uses a different server. No session started.')
+            except Exception:
+                sys.exit('Could not read saved terminal pairing. No session started.')
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter('error', GetPassWarning)
-                setup = terminal_setup(read=input, read_secret=getpass)
+                setup = terminal_setup(read=input, read_secret=getpass,saved=bool(saved_terminal),remember=remember_terminal)
         except (EOFError, KeyboardInterrupt, GetPassWarning):
             sys.exit('Terminal setup canceled; no session started.')
         except ValueError as exc:
@@ -446,6 +472,6 @@ if __name__=='__main__':
     root=tk.Tk();companion=Companion(root,restore=not terminal);companion.show_event=show_event
     if terminal:
         root.update_idletasks()
-        connect_from_terminal(companion,*setup)
+        connect_from_terminal(companion,*setup,saved=saved_terminal,remember=remember_terminal)
         del setup
     root.mainloop()

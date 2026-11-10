@@ -43,3 +43,33 @@ def forget():
         return
     (ROOT/'enrollment.dat').unlink(missing_ok=True)
     (LEGACY_ROOT/'enrollment.dat').unlink(missing_ok=True)
+
+
+def save_terminal(config):
+    """Remember only the device credential for explicit terminal launches."""
+    if os.name != 'nt':
+        raise RuntimeError('Remembering terminal pairing requires Windows DPAPI.')
+    import win32crypt
+    values = {key: config[key] for key in ('id', 'token', 'url')}
+    ROOT.mkdir(parents=True, exist_ok=True)
+    blob = win32crypt.CryptProtectData(json.dumps(values).encode(), 'ZDesk terminal enrollment', None, None, None, 0)
+    temp = ROOT / 'enrollment-terminal.tmp'
+    temp.write_bytes(blob)
+    temp.replace(ROOT / 'enrollment-terminal.dat')
+
+
+def load_terminal():
+    if os.name != 'nt':
+        raise RuntimeError('Remembering terminal pairing requires Windows DPAPI.')
+    path = ROOT / 'enrollment-terminal.dat'
+    if not path.exists():
+        return None
+    import win32crypt
+    values = json.loads(win32crypt.CryptUnprotectData(path.read_bytes(), None, None, None, 0)[1])
+    if not isinstance(values, dict) or not all(isinstance(values.get(k), str) and values[k] for k in ('id', 'token', 'url')):
+        raise ValueError('Invalid saved terminal enrollment.')
+    return values
+
+
+def forget_terminal():
+    (ROOT / 'enrollment-terminal.dat').unlink(missing_ok=True)

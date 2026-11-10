@@ -1,6 +1,7 @@
-param([switch]$TerminalSetup)
+param([switch]$TerminalSetup, [switch]$RememberPairing)
 
 $ErrorActionPreference = 'Stop'
+if ($RememberPairing) { $TerminalSetup = $true }
 if ($TerminalSetup) {
     $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -16,7 +17,9 @@ try {
     & .\.venv\Scripts\python.exe -m pip install -r requirements.txt
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     if ($TerminalSetup) {
-        & .\.venv\Scripts\python.exe agent.py --terminal-setup
+        $launchArgs = @('agent.py', '--terminal-setup')
+        if ($RememberPairing) { $launchArgs += '--remember-pairing' }
+        & .\.venv\Scripts\python.exe @launchArgs
     } else {
         & .\.venv\Scripts\python.exe agent.py
     }

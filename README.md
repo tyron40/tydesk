@@ -71,7 +71,7 @@ Download and extract the [Windows source ZIP](https://zdesk-nnym.onrender.com/do
 .\start-agent.ps1 -TerminalSetup
 ```
 
-Choose the optional sharing features, enter the masked ZDesk pairing code or connection passcode, and type `CONNECT` after checking the sharing summary. ZDesk opens a visible window with a Disconnect button. Terminal setup does not save pairing, start at sign-in, or run in the tray on close. The portable, windowed EXE still uses its own pairing screen. Do not put your Windows password or ZDesk code into the command.
+Choose the optional sharing features, enter the masked ZDesk pairing code or connection passcode, and type `CONNECT` after checking the sharing summary. ZDesk opens a visible window with a Disconnect button. Terminal setup does not start at sign-in or run in the tray on close. To opt in to remembering the pairing, run `.\start-agent.ps1 -TerminalSetup -RememberPairing`. Enter the code on the first run; later runs with the same switch reuse the device token protected by Windows DPAPI. They still show the sharing summary and require `CONNECT`. The passcode and sharing choices are not saved. Use **Forget this computer** from that session to remove its saved terminal pairing. The portable, windowed EXE still uses its own pairing screen. Do not put your Windows password or ZDesk code into the command.
 
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
