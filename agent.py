@@ -331,7 +331,7 @@ class Companion:
         if self.tray:self.tray.stop()
         self.root.after(600,self.root.destroy)
 
-def terminal_setup(*, read, read_secret, write=print, saved=False, remember=False, all_sharing=False):
+def terminal_setup(*, read, read_secret, write=print, saved=False, remember=False, all_sharing=False, start_in_tray=False):
     """Collect consent on the local console before starting a visible session."""
     options = {
         'control': 'mouse and keyboard control',
@@ -346,6 +346,7 @@ def terminal_setup(*, read, read_secret, write=print, saved=False, remember=Fals
     for key, description in options.items():
         write(f'  {key}: {description}')
     write('This starts a visible session and does not enable startup.')
+    if start_in_tray:write('The main window stays closed. The visible ZDesk tray icon provides Open, Disconnect and Quit.')
     if remember:write('Windows will protect the saved device token. The passcode and sharing choices are not saved.')
     if all_sharing:
         selected = set(options)
@@ -392,6 +393,25 @@ def connect_from_terminal(companion, code, selected, *, saved=None, remember=Fal
         companion.code.set('')
 
 
+def connect_in_tray(companion, setup, *, saved=None, remember=False):
+    """Do not begin capture until the visible tray control is ready."""
+    companion.ensure_tray()
+    deadline = time.monotonic() + 8
+    def ready():
+        if companion.exiting:
+            return
+        if companion.tray and companion.tray_ready.is_set():
+            companion.background.set(True)
+            connect_from_terminal(companion, *setup, saved=saved, remember=remember)
+            companion.tray.title = 'ZDesk — sharing screen' + ''.join(' + '+key for key in sorted(setup[1]))
+        elif not companion.tray or time.monotonic() >= deadline:
+            companion.show()
+            companion.status.set('Tray unavailable. Sharing has not started. Use Connect in this window.')
+        else:
+            companion.root.after(100, ready)
+    ready()
+
+
 if __name__=='__main__':
     if '--desktop-self-test' in sys.argv:
         from desktop_probe import run as probe
@@ -436,7 +456,8 @@ if __name__=='__main__':
     terminal = '--terminal-setup' in flags
     remember_terminal = terminal and '--remember-pairing' in flags
     all_sharing = terminal and '--all-sharing' in flags
-    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing'}):
+    start_in_tray = terminal and '--start-in-tray' in flags
+    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing','--start-in-tray'}):
         sys.exit('Unknown terminal setup option. Enter the pairing code only at the masked prompt.')
     if terminal and (getattr(sys, 'frozen', False) or not sys.stdin or not sys.stdin.isatty()):
         sys.exit('Open the Windows source launcher from an interactive PowerShell terminal.')
@@ -469,16 +490,19 @@ if __name__=='__main__':
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter('error', GetPassWarning)
-                setup = terminal_setup(read=input, read_secret=getpass,saved=bool(saved_terminal),remember=remember_terminal,all_sharing=all_sharing)
+                setup = terminal_setup(read=input, read_secret=getpass,saved=bool(saved_terminal),remember=remember_terminal,all_sharing=all_sharing,start_in_tray=start_in_tray)
         except (EOFError, KeyboardInterrupt, GetPassWarning):
             sys.exit('Terminal setup canceled; no session started.')
         except ValueError as exc:
             sys.exit(str(exc))
         if setup is None:
             sys.exit('Terminal setup canceled; no session started.')
-    root=tk.Tk();companion=Companion(root,restore=not terminal);companion.show_event=show_event
+    root=tk.Tk()
+    if start_in_tray:root.withdraw()
+    companion=Companion(root,restore=not terminal);companion.show_event=show_event
     if terminal:
         root.update_idletasks()
-        connect_from_terminal(companion,*setup,saved=saved_terminal,remember=remember_terminal)
+        if start_in_tray:connect_in_tray(companion,setup,saved=saved_terminal,remember=remember_terminal)
+        else:connect_from_terminal(companion,*setup,saved=saved_terminal,remember=remember_terminal)
         del setup
     root.mainloop()

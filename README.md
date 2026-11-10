@@ -75,6 +75,8 @@ Choose the optional sharing features, enter the masked ZDesk pairing code or con
 
 To preselect every available sharing feature from PowerShell, add `-AllSharing`. With the direct Python command, use `--terminal-setup --remember-pairing --all-sharing`. Review the printed sharing summary, enter the pairing code at the masked prompt if needed, and type `CONNECT` to begin. This does not grant Windows administrator privileges or change Windows privacy settings.
 
+To start without opening the main window, add `-StartInTray` (Python: `--start-in-tray`). PowerShell still displays the sharing summary and requires local confirmation. The visible ZDesk tray icon must start before sharing can begin and offers Open ZDesk, Disconnect and Quit. If the icon cannot start, the window opens and sharing does not begin. This is for a signed-in Windows session; it does not bypass sign-in or Windows security settings. No new pairing-code generation is involved.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.

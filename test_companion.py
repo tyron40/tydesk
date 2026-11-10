@@ -140,4 +140,23 @@ class TerminalSetupTests(unittest.TestCase):
    result=agent.terminal_setup(read=lambda _: 'CONNECT',read_secret=secret,write=write,all_sharing=True)
   self.assertEqual(result,('sample-code',{'control','microphone','camera','files'}))
 
+ def test_tray_capture_waits_for_visible_controls(self):
+  app=CompanionTests().app();app.ensure_tray=Mock();app.tray=Mock();app.tray_ready=threading.Event();app.show=Mock()
+  setup=('synthetic-code',{'microphone'})
+  with patch('agent.connect_from_terminal') as connect:
+   agent.connect_in_tray(app,setup,remember=True)
+   connect.assert_not_called()
+   app.tray_ready.set()
+   app.root.after.call_args.args[1]()
+   connect.assert_called_once_with(app,*setup,saved=None,remember=True)
+   app.background.set.assert_called_with(True)
+   app.show.assert_not_called()
+
+ def test_failed_tray_does_not_start_capture(self):
+  app=CompanionTests().app();app.ensure_tray=Mock();app.tray=None;app.show=Mock()
+  with patch('agent.connect_from_terminal') as connect:
+   agent.connect_in_tray(app,('synthetic-code',{'microphone'}))
+  connect.assert_not_called();app.show.assert_called_once()
+  self.assertIn('Sharing has not started',app.status.set.call_args.args[0])
+
 if __name__=='__main__':unittest.main()
