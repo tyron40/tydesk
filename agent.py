@@ -321,6 +321,57 @@ class Companion:
         if self.tray:self.tray.stop()
         self.root.after(600,self.root.destroy)
 
+def terminal_setup(*, read, read_secret, write=print):
+    """Collect consent on the local console before starting a visible session."""
+    options = {
+        'control': 'mouse and keyboard control',
+        'audio': 'system playback audio',
+        'microphone': 'microphone (nearby sound)',
+        'camera': 'camera (surroundings)',
+        'files': 'files in ZDesk Shared and Inbox',
+    }
+    if not desktop_runtime.system_audio_available():
+        del options['audio']
+    write('ZDesk will share the primary screen with the paired dashboard.')
+    for key, description in options.items():
+        write(f'  {key}: {description}')
+    write('This starts a visible session. It does not save pairing or enable startup.')
+    selection = read('Optional features (comma-separated, all, or Enter for screen only): ')
+    selected = {value.strip().lower() for value in selection.split(',') if value.strip()}
+    if selected == {'all'}:
+        selected = set(options)
+    if not selected <= options.keys():
+        raise ValueError('Unknown or unsupported sharing feature. No session started.')
+    write('Selected: primary screen' + ''.join(', ' + options[key] for key in options if key in selected))
+    code = read_secret('ZDesk pairing code or connection passcode: ').strip()
+    if not code or len(code) > 200:
+        raise ValueError('Enter a valid-length ZDesk code. No session started.')
+    if read('Type CONNECT to start sharing, or press Enter to cancel: ') != 'CONNECT':
+        return None
+    return code, selected
+
+
+def connect_from_terminal(companion, code, selected):
+    """Use the same permission switches and pairing path as the desktop UI."""
+    switches = {
+        'control': (companion.control, companion.allow),
+        'audio': (companion.system_audio, companion.audio),
+        'microphone': (companion.microphone, companion.mic),
+        'camera': (companion.camera_permission, companion.camera),
+        'files': (companion.file_permission, companion.files),
+    }
+    for key, (var, event) in switches.items():
+        var.set(key in selected)
+        companion.permission(var, event, persist=False)
+    if 'camera' in selected:
+        companion.camera_status.set('Camera selected · automatic detection when connected')
+    companion.code.set(code)
+    try:
+        companion.connect()
+    finally:
+        companion.code.set('')
+
+
 if __name__=='__main__':
     if '--desktop-self-test' in sys.argv:
         from desktop_probe import run as probe
@@ -361,6 +412,9 @@ if __name__=='__main__':
             sys.exit(0)
         except Exception as exc:
             output.write_text(json.dumps({'ok':False,'error':str(exc)}));sys.exit(1)
+    terminal = sys.argv[1:] == ['--terminal-setup']
+    if terminal and (getattr(sys, 'frozen', False) or not sys.stdin or not sys.stdin.isatty()):
+        sys.exit('Open the Windows source launcher from an interactive PowerShell terminal.')
     # A second launch brings the existing window back from the tray.
     mutex=None;show_event=None
     if sys.platform=='win32':
@@ -372,5 +426,26 @@ if __name__=='__main__':
         kernel.SetEvent.argtypes=[wintypes.HANDLE];kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
         mutex=kernel.CreateMutexW(None,False,'Local\\ZDeskCompanion');already=kernel.GetLastError()==183
         show_event=kernel.CreateEventW(None,False,False,'Local\\ZDeskShowCompanion')
-        if already:kernel.SetEvent(show_event);sys.exit(0)
-    root=tk.Tk();companion=Companion(root);companion.show_event=show_event;root.mainloop()
+        if already:
+            kernel.SetEvent(show_event)
+            if terminal:sys.exit('Quit the running ZDesk companion before starting terminal setup.')
+            sys.exit(0)
+    if terminal:
+        from getpass import getpass, GetPassWarning
+        import warnings
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter('error', GetPassWarning)
+                setup = terminal_setup(read=input, read_secret=getpass)
+        except (EOFError, KeyboardInterrupt, GetPassWarning):
+            sys.exit('Terminal setup canceled; no session started.')
+        except ValueError as exc:
+            sys.exit(str(exc))
+        if setup is None:
+            sys.exit('Terminal setup canceled; no session started.')
+    root=tk.Tk();companion=Companion(root,restore=not terminal);companion.show_event=show_event
+    if terminal:
+        root.update_idletasks()
+        connect_from_terminal(companion,*setup)
+        del setup
+    root.mainloop()

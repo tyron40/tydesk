@@ -62,6 +62,8 @@ def install(app, durable_devices=None):
                 '3. Double-click Start-ZDesk.cmd. First launch downloads Python dependencies.\r\n'
                 '4. Create a pairing code at https://zdesk-nnym.onrender.com and paste it into the companion.\r\n'
                 '5. Enable the permissions you want and press Start / reconnect.\r\n\r\n'
+                'Terminal setup: from regular PowerShell in this folder, run .\\start-agent.ps1 -TerminalSetup.\r\n'
+                'Choose sharing features, enter the masked ZDesk code, then type CONNECT to start a visible session.\r\n\r\n'
                 'Optional sign-in startup: enable Remember this device, then run install-startup.ps1.\r\n'
                 'Remove startup with uninstall-startup.ps1. Disconnect or Quit ZDesk stops sharing. With tray mode enabled, closing the window keeps access available.\r\n'
                 'This package is source code, not a standalone EXE or signed installer.\r\n')

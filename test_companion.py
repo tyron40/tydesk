@@ -61,4 +61,36 @@ class CompanionTests(unittest.TestCase):
   a=self.app();a.running=True;a.show=Mock()
   with patch('agent.messagebox.askyesno') as confirm:
    a.confirm_uninstall({'id':'request'});confirm.assert_not_called()
+
+class TerminalSetupTests(unittest.TestCase):
+ def test_screen_only_masks_code_and_requires_local_confirmation(self):
+  read=Mock(side_effect=['','CONNECT']); secret=Mock(return_value='sample-code'); write=Mock()
+  self.assertEqual(agent.terminal_setup(read=read,read_secret=secret,write=write),('sample-code',set()))
+  secret.assert_called_once()
+  self.assertNotIn('sample-code',str(read.call_args_list)+str(write.call_args_list))
+  self.assertIsNone(agent.terminal_setup(read=Mock(side_effect=['all','']),read_secret=secret,write=write))
+
+ def test_select_all_includes_only_supported_features(self):
+  with patch('agent.desktop_runtime.system_audio_available',return_value=False):
+   result=agent.terminal_setup(read=Mock(side_effect=['all','CONNECT']),read_secret=lambda _: 'sample',write=Mock())
+  self.assertEqual(result,('sample',{'control','microphone','camera','files'}))
+
+ def test_invalid_feature_is_rejected_before_passcode(self):
+  secret=Mock()
+  with self.assertRaises(ValueError):
+   agent.terminal_setup(read=lambda _: 'startup',read_secret=secret,write=Mock())
+  secret.assert_not_called()
+
+ def test_terminal_connection_sets_permissions_without_saving_pairing(self):
+  app=CompanionTests().app()
+  app.control=Mock();app.system_audio=Mock();app.microphone=Mock();app.file_permission=Mock()
+  app.mic=threading.Event();app.connect=Mock();app.save=Mock()
+  for attr in ['control','system_audio','microphone','camera_permission','file_permission']:
+   var=getattr(app,attr);var.set.side_effect=lambda value,var=var: setattr(var.get,'return_value',value)
+  agent.connect_from_terminal(app,'sample',{'microphone'})
+  self.assertTrue(app.mic.is_set())
+  self.assertFalse(any(event.is_set() for event in [app.audio,app.allow,app.camera,app.files]))
+  app.connect.assert_called_once();app.save.assert_not_called()
+  self.assertEqual([c.args for c in app.code.set.call_args_list],[('sample',),('',)])
+
 if __name__=='__main__':unittest.main()

@@ -63,6 +63,16 @@ Browser mode has no OS mouse/keyboard control, system audio, file exchange or un
 
 For native features, use Download ZDesk for Windows on that page or https://zdesk-nnym.onrender.com/download/windows. The source alternative is https://zdesk-nnym.onrender.com/download/windows-source. The source ZIP contains the companion source and Start-ZDesk.cmd; it does not redirect to GitHub. To use the source alternative, extract all files, install Python 3.12 or 3.13 with its launcher and Tcl/Tk, and double-click Start-ZDesk.cmd. The standalone EXE requires no Python; both versions default to the hosted server. The download contains no passwords, enrollment credentials, or server data.
 
+## Pair from PowerShell on Windows
+
+Download and extract the [Windows source ZIP](https://zdesk-nnym.onrender.com/download/windows-source), install Python 3.12 with the Windows launcher and Tcl/Tk, and open regular PowerShell in the extracted ZDesk-Companion folder. Quit any running ZDesk instance first.
+
+```powershell
+.\start-agent.ps1 -TerminalSetup
+```
+
+Choose the optional sharing features, enter the masked ZDesk pairing code or connection passcode, and type `CONNECT` after checking the sharing summary. ZDesk opens a visible window with a Disconnect button. Terminal setup does not save pairing, start at sign-in, or run in the tray on close. The portable, windowed EXE still uses its own pairing screen. Do not put your Windows password or ZDesk code into the command.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.
