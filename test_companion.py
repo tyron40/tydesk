@@ -127,4 +127,17 @@ class TerminalSetupTests(unittest.TestCase):
     agent.local_settings.forget_terminal();self.assertIsNone(agent.local_settings.load_terminal())
     self.assertEqual(gui.read_bytes(),b'gui-store')
 
+ def test_preselect_all_skips_feature_prompt_and_still_requires_consent(self):
+  secret=Mock(return_value='sample-code');write=Mock();read=Mock(return_value='')
+  with patch('agent.desktop_runtime.system_audio_available',return_value=False):
+   self.assertIsNone(agent.terminal_setup(read=read,read_secret=secret,write=write,all_sharing=True))
+   read.assert_called_once()
+   self.assertIn('Type CONNECT',read.call_args.args[0])
+   summary=next(c.args[0] for c in write.call_args_list if c.args[0].startswith('Selected:'))
+   self.assertIn('microphone (nearby sound)',summary)
+   self.assertIn('camera (surroundings)',summary)
+   self.assertNotIn('system playback',summary)
+   result=agent.terminal_setup(read=lambda _: 'CONNECT',read_secret=secret,write=write,all_sharing=True)
+  self.assertEqual(result,('sample-code',{'control','microphone','camera','files'}))
+
 if __name__=='__main__':unittest.main()

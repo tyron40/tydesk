@@ -331,7 +331,7 @@ class Companion:
         if self.tray:self.tray.stop()
         self.root.after(600,self.root.destroy)
 
-def terminal_setup(*, read, read_secret, write=print, saved=False, remember=False):
+def terminal_setup(*, read, read_secret, write=print, saved=False, remember=False, all_sharing=False):
     """Collect consent on the local console before starting a visible session."""
     options = {
         'control': 'mouse and keyboard control',
@@ -347,12 +347,15 @@ def terminal_setup(*, read, read_secret, write=print, saved=False, remember=Fals
         write(f'  {key}: {description}')
     write('This starts a visible session and does not enable startup.')
     if remember:write('Windows will protect the saved device token. The passcode and sharing choices are not saved.')
-    selection = read('Optional features (comma-separated, all, or Enter for screen only): ')
-    selected = {value.strip().lower() for value in selection.split(',') if value.strip()}
-    if selected == {'all'}:
+    if all_sharing:
         selected = set(options)
-    if not selected <= options.keys():
-        raise ValueError('Unknown or unsupported sharing feature. No session started.')
+    else:
+        selection = read('Optional features (comma-separated, all, or Enter for screen only): ')
+        selected = {value.strip().lower() for value in selection.split(',') if value.strip()}
+        if selected == {'all'}:
+            selected = set(options)
+        if not selected <= options.keys():
+            raise ValueError('Unknown or unsupported sharing feature. No session started.')
     write('Selected: primary screen' + ''.join(', ' + options[key] for key in options if key in selected))
     if saved:
         write('Using the saved terminal pairing for this Windows account.')
@@ -429,8 +432,12 @@ if __name__=='__main__':
             sys.exit(0)
         except Exception as exc:
             output.write_text(json.dumps({'ok':False,'error':str(exc)}));sys.exit(1)
-    remember_terminal = sys.argv[1:] == ['--terminal-setup','--remember-pairing']
-    terminal = sys.argv[1:] == ['--terminal-setup'] or remember_terminal
+    flags = sys.argv[1:]
+    terminal = '--terminal-setup' in flags
+    remember_terminal = terminal and '--remember-pairing' in flags
+    all_sharing = terminal and '--all-sharing' in flags
+    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing'}):
+        sys.exit('Unknown terminal setup option. Enter the pairing code only at the masked prompt.')
     if terminal and (getattr(sys, 'frozen', False) or not sys.stdin or not sys.stdin.isatty()):
         sys.exit('Open the Windows source launcher from an interactive PowerShell terminal.')
     # A second launch brings the existing window back from the tray.
@@ -462,7 +469,7 @@ if __name__=='__main__':
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter('error', GetPassWarning)
-                setup = terminal_setup(read=input, read_secret=getpass,saved=bool(saved_terminal),remember=remember_terminal)
+                setup = terminal_setup(read=input, read_secret=getpass,saved=bool(saved_terminal),remember=remember_terminal,all_sharing=all_sharing)
         except (EOFError, KeyboardInterrupt, GetPassWarning):
             sys.exit('Terminal setup canceled; no session started.')
         except ValueError as exc:

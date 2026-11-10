@@ -73,6 +73,8 @@ Download and extract the [Windows source ZIP](https://zdesk-nnym.onrender.com/do
 
 Choose the optional sharing features, enter the masked ZDesk pairing code or connection passcode, and type `CONNECT` after checking the sharing summary. ZDesk opens a visible window with a Disconnect button. Terminal setup does not start at sign-in or run in the tray on close. To opt in to remembering the pairing, run `.\start-agent.ps1 -TerminalSetup -RememberPairing`. Enter the code on the first run; later runs with the same switch reuse the device token protected by Windows DPAPI. They still show the sharing summary and require `CONNECT`. The passcode and sharing choices are not saved. Use **Forget this computer** from that session to remove its saved terminal pairing. The portable, windowed EXE still uses its own pairing screen. Do not put your Windows password or ZDesk code into the command.
 
+To preselect every available sharing feature from PowerShell, add `-AllSharing`. With the direct Python command, use `--terminal-setup --remember-pairing --all-sharing`. Review the printed sharing summary, enter the pairing code at the masked prompt if needed, and type `CONNECT` to begin. This does not grant Windows administrator privileges or change Windows privacy settings.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.

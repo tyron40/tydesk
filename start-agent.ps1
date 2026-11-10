@@ -1,7 +1,7 @@
-param([switch]$TerminalSetup, [switch]$RememberPairing)
+param([switch]$TerminalSetup, [switch]$RememberPairing, [switch]$AllSharing)
 
 $ErrorActionPreference = 'Stop'
-if ($RememberPairing) { $TerminalSetup = $true }
+if ($RememberPairing -or $AllSharing) { $TerminalSetup = $true }
 if ($TerminalSetup) {
     $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -19,6 +19,7 @@ try {
     if ($TerminalSetup) {
         $launchArgs = @('agent.py', '--terminal-setup')
         if ($RememberPairing) { $launchArgs += '--remember-pairing' }
+        if ($AllSharing) { $launchArgs += '--all-sharing' }
         & .\.venv\Scripts\python.exe @launchArgs
     } else {
         & .\.venv\Scripts\python.exe agent.py
