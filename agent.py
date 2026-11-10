@@ -198,7 +198,7 @@ class Companion:
         client=requests.Session();credentials=saved;failure=None;audio_thread=None;file_thread=None;input_thread=None;camera_thread=None
         try:
             if not credentials:
-                r=client.post(url+'/api/enroll',json={'code':code,'name':platform.node()},timeout=90)
+                r=client.post(url+'/api/enroll',json={'code':code,'name':platform.node()},timeout=(5,15) if getattr(self,'console_mode',False) else 90)
                 if r.status_code in (401,403):raise ValueError('Code expired or passcode incorrect. Paste a new code or check your connection passcode.')
                 if r.status_code==429:raise ValueError('Too many connection attempts. Wait one minute and try again.')
                 r.raise_for_status()
@@ -213,6 +213,8 @@ class Companion:
                     r=client.post(base+'/frame',data=buf.getvalue(),headers={'Content-Type':'image/jpeg','X-Allow-Camera':'yes' if self.camera.is_set() else 'no','X-Allow-Control':'yes' if self.allow.is_set() else 'no','X-Allow-Audio':'yes' if self.audio.is_set() or self.mic.is_set() else 'no','X-Allow-Files':'yes' if self.files.is_set() else 'no','X-TyDesk-Protocol':'2','X-Remote-Cursor':remote_input.cursor_shape(),'X-Companion-Platform':desktop_runtime.platform_id(),'X-Companion-Removal':'1' if sys.platform=='win32' and getattr(sys,'frozen',False) else '0'},timeout=8)
                     if r.status_code==401:raise PermissionError('Saved connection no longer exists. Paste a new pairing code or your reusable passcode, then Connect.')
                     r.raise_for_status()
+                    if getattr(self,'console_mode',False) and not getattr(self,'console_connected',False):
+                        self.console_connected=True;self.events.put(('connected','Primary display is sharing. Ctrl+C stops.'))
                     if self.camera.is_set() and (camera_thread is None or not camera_thread.is_alive()):
                         from camera_capture import start as start_camera
                         camera_thread=start_camera(base,credentials['token'],stop,self.camera,self.events.put)
@@ -370,6 +372,72 @@ def terminal_setup(*, read, read_secret, write=print, saved=False, remember=Fals
     return code, selected
 
 
+class ConsoleSession:
+    """Foreground console state for the existing, permission-gated capture worker."""
+    run = Companion.run
+    input_worker = Companion.input_worker
+    file_worker = Companion.file_worker
+
+    def __init__(self, selected):
+        self.console_mode=True
+        self.stop=threading.Event()
+        self.events=queue.Queue()
+        self.control_failure=None
+        self.home=Path.home()/'ZDesk'
+        self.home.mkdir(exist_ok=True)
+        for key, name in [('control','allow'),('audio','audio'),('microphone','mic'),('camera','camera'),('files','files')]:
+            event=threading.Event()
+            if key in selected:event.set()
+            setattr(self,name,event)
+
+
+def run_console(setup, *, saved=None, remember=False, write=print):
+    """Keep capture tied to this terminal; Ctrl+C signals all existing workers."""
+    code, selected=setup
+    session=ConsoleSession(selected)
+    worker=threading.Thread(target=session.run,args=(DEFAULT_SERVER,code,saved,True),daemon=True)
+    write('ZDesk foreground sharing session. Keep this terminal open. Ctrl+C stops sharing.')
+    write('Connecting to the paired dashboard…')
+    worker.start()
+    code=None;setup=None
+    last_status=time.monotonic()
+    result=0
+    try:
+        while worker.is_alive() or not session.events.empty():
+            try:kind, value=session.events.get(timeout=.25)
+            except queue.Empty:
+                if time.monotonic()-last_status>=10:
+                    write('ZDesk session active — Ctrl+C stops sharing.')
+                    last_status=time.monotonic()
+                continue
+            if kind=='credentials':
+                if remember:
+                    try:local_settings.save_terminal(value)
+                    except Exception:write('Connected, but pairing could not be remembered.')
+            elif kind=='revoked':
+                if remember:local_settings.forget_terminal()
+                write('Pairing revoked. Sharing is stopping.');session.stop.set();result=1
+            elif kind=='uninstall':
+                write('Removal requires the normal companion. No removal performed.')
+            elif kind=='done':
+                if str(value).startswith('Stopped:'):result=1
+                write(str(value).replace('Click Start to reconnect.','Run the command again to reconnect.'))
+            elif kind in ('status','connected','camera_status','camera_done','camera_error','control_error'):
+                if kind=='status' and str(value).startswith('Sharing primary display'):
+                    continue
+                write('ZDesk: '+str(value))
+            if kind=='connected':last_status=time.monotonic()
+    except KeyboardInterrupt:
+        write('Stopping ZDesk…')
+    finally:
+        session.stop.set()
+        for event in (session.allow,session.audio,session.mic,session.camera,session.files):event.clear()
+        # The capture worker has bounded network timeouts and releases input/audio.
+        worker.join()
+        write('ZDesk sharing stopped.')
+    return result
+
+
 def connect_from_terminal(companion, code, selected, *, saved=None, remember=False):
     """Use the same permission switches and pairing path as the desktop UI."""
     switches = {
@@ -457,8 +525,15 @@ if __name__=='__main__':
     remember_terminal = terminal and '--remember-pairing' in flags
     all_sharing = terminal and '--all-sharing' in flags
     start_in_tray = terminal and '--start-in-tray' in flags
-    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing','--start-in-tray'}):
+    console_mode = terminal and '--console' in flags
+    if console_mode and start_in_tray:sys.exit('Choose foreground console or tray mode, not both.')
+    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing','--start-in-tray','--console'}):
         sys.exit('Unknown terminal setup option. Enter the pairing code only at the masked prompt.')
+    if console_mode and sys.platform=='win32':
+        import ctypes
+        if ctypes.windll.shell32.IsUserAnAdmin():sys.exit('Use a regular Windows terminal for foreground sharing.')
+    if console_mode and (sys.platform!='win32' or not sys.stdout or not sys.stdout.isatty()):
+        sys.exit('Console mode requires a visible interactive Windows terminal.')
     if terminal and (getattr(sys, 'frozen', False) or not sys.stdin or not sys.stdin.isatty()):
         sys.exit('Open the Windows source launcher from an interactive PowerShell terminal.')
     # A second launch brings the existing window back from the tray.
@@ -497,6 +572,8 @@ if __name__=='__main__':
             sys.exit(str(exc))
         if setup is None:
             sys.exit('Terminal setup canceled; no session started.')
+    if console_mode:
+        sys.exit(run_console(setup,saved=saved_terminal,remember=remember_terminal))
     root=tk.Tk()
     if start_in_tray:root.withdraw()
     companion=Companion(root,restore=not terminal);companion.show_event=show_event

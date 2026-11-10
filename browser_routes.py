@@ -66,7 +66,8 @@ def install(app, durable_devices=None):
                 'Choose sharing features, enter the masked ZDesk code, then type CONNECT to start a visible session.\r\n'
                 'Add -RememberPairing to reuse the Windows-protected device token next time.\r\n'
                 'Add -AllSharing to preselect all supported sharing features; CONNECT is still required.\r\n'
-                'Add -StartInTray to keep the main window closed with a visible ZDesk tray icon and Stop controls.\r\n\r\n'
+                'Add -StartInTray to keep the main window closed with a visible ZDesk tray icon and Stop controls.\r\n'
+                'Or add -Console for a visible foreground terminal session; keep it open and press Ctrl+C to stop.\r\n\r\n'
                 'Optional sign-in startup: enable Remember this device, then run install-startup.ps1.\r\n'
                 'Remove startup with uninstall-startup.ps1. Disconnect or Quit ZDesk stops sharing. With tray mode enabled, closing the window keeps access available.\r\n'
                 'This package is source code, not a standalone EXE or signed installer.\r\n')

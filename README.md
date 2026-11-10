@@ -77,6 +77,12 @@ To preselect every available sharing feature from PowerShell, add `-AllSharing`.
 
 To start without opening the main window, add `-StartInTray` (Python: `--start-in-tray`). PowerShell still displays the sharing summary and requires local confirmation. The visible ZDesk tray icon must start before sharing can begin and offers Open ZDesk, Disconnect and Quit. If the icon cannot start, the window opens and sharing does not begin. This is for a signed-in Windows session; it does not bypass sign-in or Windows security settings. No new pairing-code generation is involved.
 
+### Foreground console session
+
+Run `.\start-agent.ps1 -Console -AllSharing -RememberPairing` from an interactive, regular Windows PowerShell session. The direct Python form is `.\.venv\Scripts\python.exe agent.py --terminal-setup --console --all-sharing --remember-pairing`. Enter the existing pairing code at the masked prompt, review the local sharing summary, and type `CONNECT`.
+
+This mode does not create a Tk window or tray icon: the visible terminal identifies ZDesk, reports connection and capture status, and provides Ctrl+C to stop. Keep the terminal open. It uses the same capture, input validation and selected-feature checks as the desktop app, while storing only the optional Windows-protected device credential. It does not install a service, enable sign-in startup, disguise itself, grant administrator privileges, or modify Windows privacy/security settings. Uninstall requests require the ordinary companion.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.

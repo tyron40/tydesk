@@ -159,4 +159,47 @@ class TerminalSetupTests(unittest.TestCase):
   connect.assert_not_called();app.show.assert_called_once()
   self.assertIn('Sharing has not started',app.status.set.call_args.args[0])
 
+
+class ConsoleSessionTests(unittest.TestCase):
+ def test_console_uses_selected_permissions_and_never_creates_window(self):
+  import tempfile
+  from pathlib import Path
+  token={'id':'test-id','token':'test-device-token','url':agent.DEFAULT_SERVER}
+  def worker(session,url,code,saved,retry):
+   self.assertEqual(code,'synthetic-passcode')
+   self.assertTrue(session.mic.is_set())
+   self.assertFalse(session.camera.is_set())
+   session.events.put(('credentials',token))
+   session.events.put(('connected','Primary display is sharing.'))
+   session.events.put(('done','Disconnected. Click Start to reconnect.'))
+  output=Mock()
+  with tempfile.TemporaryDirectory() as temp,patch('agent.Path.home',return_value=Path(temp)),patch.object(agent.ConsoleSession,'run',worker),patch('agent.tk.Tk') as window,patch('agent.local_settings.save_terminal') as save:
+   self.assertEqual(agent.run_console(('synthetic-passcode',{'microphone'}),remember=True,write=output),0)
+   window.assert_not_called();save.assert_called_once_with(token)
+  self.assertIn('Ctrl+C',str(output.call_args_list))
+  self.assertNotIn('synthetic-passcode',str(output.call_args_list))
+  self.assertNotIn('test-device-token',str(output.call_args_list))
+
+ def test_ctrl_c_stops_and_clears_every_capture_permission(self):
+  import tempfile
+  from pathlib import Path
+  with tempfile.TemporaryDirectory() as temp,patch('agent.Path.home',return_value=Path(temp)):
+   session=agent.ConsoleSession({'control','audio','microphone','camera','files'})
+  session.events=Mock()
+  session.events.get.side_effect=KeyboardInterrupt
+  session.run=lambda *args:session.stop.wait(3)
+  with patch('agent.ConsoleSession',return_value=session):
+   agent.run_console(('synthetic-passcode',{'microphone'}),write=Mock())
+  self.assertTrue(session.stop.is_set())
+  self.assertFalse(any(e.is_set() for e in (session.allow,session.audio,session.mic,session.camera,session.files)))
+
+ def test_rejected_pairing_does_not_get_saved(self):
+  def worker(session,*args):
+   session.events.put(('done','Stopped: pairing rejected'))
+  import tempfile
+  from pathlib import Path
+  with tempfile.TemporaryDirectory() as temp,patch('agent.Path.home',return_value=Path(temp)),patch.object(agent.ConsoleSession,'run',worker),patch('agent.local_settings.save_terminal') as save:
+   self.assertEqual(agent.run_console(('synthetic-passcode',set()),remember=True,write=Mock()),1)
+   save.assert_not_called()
+
 if __name__=='__main__':unittest.main()

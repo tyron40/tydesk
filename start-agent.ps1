@@ -1,7 +1,8 @@
-param([switch]$TerminalSetup, [switch]$RememberPairing, [switch]$AllSharing, [switch]$StartInTray)
+param([switch]$TerminalSetup, [switch]$RememberPairing, [switch]$AllSharing, [switch]$StartInTray, [switch]$Console)
 
 $ErrorActionPreference = 'Stop'
-if ($RememberPairing -or $AllSharing -or $StartInTray) { $TerminalSetup = $true }
+if ($Console -and $StartInTray) { throw 'Choose Console or StartInTray, not both.' }
+if ($RememberPairing -or $AllSharing -or $StartInTray -or $Console) { $TerminalSetup = $true }
 if ($TerminalSetup) {
     $principal = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
     if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -21,6 +22,7 @@ try {
         if ($RememberPairing) { $launchArgs += '--remember-pairing' }
         if ($AllSharing) { $launchArgs += '--all-sharing' }
         if ($StartInTray) { $launchArgs += '--start-in-tray' }
+        if ($Console) { $launchArgs += '--console' }
         & .\.venv\Scripts\python.exe @launchArgs
     } else {
         & .\.venv\Scripts\python.exe agent.py
