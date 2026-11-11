@@ -6,6 +6,7 @@ on:
     paths:
       - remote_input.py
       - agent.py
+      - background_session.py
       - native_shell.py
       - local_settings.py
       - camera_capture.py
@@ -37,7 +38,7 @@ jobs:
       - name: Install build dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.3
       - name: Check companion recovery and tray lifecycle
-        run: python -m unittest -q test_companion.py test_remote_input.py test_audio_capture.py test_camera.py
+        run: python -m unittest -q test_companion.py test_remote_input.py test_audio_capture.py test_camera.py test_background_session.py
       - name: Check browser touch and audio logic
         run: node test_dashboard.js
       - name: Build Windows application

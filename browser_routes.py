@@ -6,7 +6,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 from flask import render_template, send_file, abort
 import download_catalog
 ROOT=Path(__file__).resolve().parent
-FILES=['desktop_runtime.py','desktop_shell.py','desktop_probe.py','camera_capture.py','remote_input.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
+FILES=['desktop_runtime.py','desktop_shell.py','desktop_probe.py','camera_capture.py','remote_input.py','background_session.py','agent.py','native_shell.py','audio_capture.py','file_exchange.py','extensions.py','local_settings.py',
        'requirements.txt','start-agent.ps1','install-startup.ps1','uninstall-startup.ps1','LICENSE']
 
 def windows_exe():
@@ -67,7 +67,8 @@ def install(app, durable_devices=None):
                 'Add -RememberPairing to reuse the Windows-protected device token next time.\r\n'
                 'Add -AllSharing to preselect all supported sharing features; CONNECT is still required.\r\n'
                 'Add -StartInTray to keep the main window closed with a visible ZDesk tray icon and Stop controls.\r\n'
-                'Or add -Console for a visible foreground terminal session; keep it open and press Ctrl+C to stop.\r\n\r\n'
+                'Or add -Console for a visible foreground terminal session; keep it open and press Ctrl+C to stop.\r\n'
+                'Add -AskKeepRunning for a local Yes/No popup. Yes starts the visible tray companion independently of PowerShell.\r\n\r\n'
                 'Optional sign-in startup: enable Remember this device, then run install-startup.ps1.\r\n'
                 'Remove startup with uninstall-startup.ps1. Disconnect or Quit ZDesk stops sharing. With tray mode enabled, closing the window keeps access available.\r\n'
                 'This package is source code, not a standalone EXE or signed installer.\r\n')

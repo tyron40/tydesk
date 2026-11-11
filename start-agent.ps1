@@ -1,6 +1,7 @@
-param([switch]$TerminalSetup, [switch]$RememberPairing, [switch]$AllSharing, [switch]$StartInTray, [switch]$Console)
+param([switch]$TerminalSetup, [switch]$RememberPairing, [switch]$AllSharing, [switch]$StartInTray, [switch]$Console, [switch]$AskKeepRunning)
 
 $ErrorActionPreference = 'Stop'
+if ($AskKeepRunning) { $Console = $true }
 if ($Console -and $StartInTray) { throw 'Choose Console or StartInTray, not both.' }
 if ($RememberPairing -or $AllSharing -or $StartInTray -or $Console) { $TerminalSetup = $true }
 if ($TerminalSetup) {
@@ -23,6 +24,7 @@ try {
         if ($AllSharing) { $launchArgs += '--all-sharing' }
         if ($StartInTray) { $launchArgs += '--start-in-tray' }
         if ($Console) { $launchArgs += '--console' }
+        if ($AskKeepRunning) { $launchArgs += '--ask-keep-running' }
         & .\.venv\Scripts\python.exe @launchArgs
     } else {
         & .\.venv\Scripts\python.exe agent.py

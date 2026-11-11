@@ -83,6 +83,12 @@ Run `.\start-agent.ps1 -Console -AllSharing -RememberPairing` from an interactiv
 
 This mode does not create a Tk window or tray icon: the visible terminal identifies ZDesk, reports connection and capture status, and provides Ctrl+C to stop. Keep the terminal open. It uses the same capture, input validation and selected-feature checks as the desktop app, while storing only the optional Windows-protected device credential. It does not install a service, enable sign-in startup, disguise itself, grant administrator privileges, or modify Windows privacy/security settings. Uninstall requests require the ordinary companion.
 
+### Yes/No choice to close PowerShell
+
+Add `-AskKeepRunning` to the terminal launcher: `.\start-agent.ps1 -Console -AllSharing -RememberPairing -AskKeepRunning`. After reviewing the sharing summary and entering the existing code, a local popup asks whether sharing should continue after PowerShell closes. It defaults to No and closes after either answer.
+
+Yes starts a separate, identifiable ZDesk tray companion. Capture starts only after its tray controls are ready. The terminal waits for acknowledgement before saying it can be closed. A Windows-DPAPI-encrypted, short-lived handoff carries the one-use code or saved device token only through the child process environment; neither is written in plaintext to command arguments or a handoff file. No keeps the foreground console session. This does not add sign-in startup, pre-login access, administrator elevation, or disguised execution. Use the ZDesk tray icon to Disconnect or Quit. Reboot/sign-out still ends this session.
+
 ## Windows quick start (VS Code → Terminal → PowerShell)
 
 Install Python 3.12 or 3.13 from python.org, including its launcher and Tcl/Tk. Extract the ZIP and open its `tydesk` folder in VS Code.

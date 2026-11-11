@@ -461,7 +461,7 @@ def connect_from_terminal(companion, code, selected, *, saved=None, remember=Fal
         companion.code.set('')
 
 
-def connect_in_tray(companion, setup, *, saved=None, remember=False):
+def connect_in_tray(companion, setup, *, saved=None, remember=False, on_ready=None, on_failure=None):
     """Do not begin capture until the visible tray control is ready."""
     companion.ensure_tray()
     deadline = time.monotonic() + 8
@@ -472,7 +472,10 @@ def connect_in_tray(companion, setup, *, saved=None, remember=False):
             companion.background.set(True)
             connect_from_terminal(companion, *setup, saved=saved, remember=remember)
             companion.tray.title = 'ZDesk — sharing screen' + ''.join(' + '+key for key in sorted(setup[1]))
+            if on_ready:on_ready()
         elif not companion.tray or time.monotonic() >= deadline:
+            if on_failure:
+                on_failure();return
             companion.show()
             companion.status.set('Tray unavailable. Sharing has not started. Use Connect in this window.')
         else:
@@ -480,7 +483,32 @@ def connect_in_tray(companion, setup, *, saved=None, remember=False):
     ready()
 
 
+def ask_keep_running(selected):
+    """Local consent, default No; the popup closes after either answer."""
+    prompt=tk.Tk()
+    prompt.withdraw()
+    try:
+        features='screen'+''.join(', '+name for name in sorted(selected))
+        return messagebox.askyesno('Keep ZDesk running?',
+            'Keep ZDesk sharing after you close PowerShell?\n\n'
+            'Shared features: '+features+'\n\n'
+            'Yes starts a visible ZDesk tray companion with Open, Disconnect and Quit. '
+            'It does not start automatically after sign-out or reboot.\n\n'
+            'No keeps this session in the foreground terminal; Ctrl+C stops it.',
+            parent=prompt,default='no')
+    finally:
+        prompt.destroy()
+
+
 if __name__=='__main__':
+    background_payload=None
+    if sys.argv[1:]==['--background-session']:
+        if sys.platform!='win32':sys.exit('Background handoff requires Windows.')
+        import ctypes
+        if ctypes.windll.shell32.IsUserAnAdmin():sys.exit('Run ZDesk as the signed-in user.')
+        from background_session import consume_handoff
+        try:background_payload=consume_handoff()
+        except Exception:sys.exit('Invalid or expired local background request.')
     if '--desktop-self-test' in sys.argv:
         from desktop_probe import run as probe
         probe(Companion,sys.argv[sys.argv.index('--desktop-self-test')+1]);sys.exit(0)
@@ -520,14 +548,16 @@ if __name__=='__main__':
             sys.exit(0)
         except Exception as exc:
             output.write_text(json.dumps({'ok':False,'error':str(exc)}));sys.exit(1)
-    flags = sys.argv[1:]
+    flags = [] if background_payload else sys.argv[1:]
     terminal = '--terminal-setup' in flags
     remember_terminal = terminal and '--remember-pairing' in flags
     all_sharing = terminal and '--all-sharing' in flags
-    start_in_tray = terminal and '--start-in-tray' in flags
+    start_in_tray = bool(background_payload) or (terminal and '--start-in-tray' in flags)
     console_mode = terminal and '--console' in flags
+    ask_background = terminal and '--ask-keep-running' in flags
+    if ask_background and not console_mode:sys.exit('AskKeepRunning requires Console mode.')
     if console_mode and start_in_tray:sys.exit('Choose foreground console or tray mode, not both.')
-    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing','--start-in-tray','--console'}):
+    if terminal and (set(flags) - {'--terminal-setup','--remember-pairing','--all-sharing','--start-in-tray','--console','--ask-keep-running'}):
         sys.exit('Unknown terminal setup option. Enter the pairing code only at the masked prompt.')
     if console_mode and sys.platform=='win32':
         import ctypes
@@ -545,6 +575,7 @@ if __name__=='__main__':
         kernel.CreateMutexW.argtypes=[ctypes.c_void_p,wintypes.BOOL,wintypes.LPCWSTR];kernel.CreateMutexW.restype=wintypes.HANDLE
         kernel.CreateEventW.argtypes=[ctypes.c_void_p,wintypes.BOOL,wintypes.BOOL,wintypes.LPCWSTR];kernel.CreateEventW.restype=wintypes.HANDLE
         kernel.SetEvent.argtypes=[wintypes.HANDLE];kernel.WaitForSingleObject.argtypes=[wintypes.HANDLE,wintypes.DWORD]
+        kernel.CloseHandle.argtypes=[wintypes.HANDLE];kernel.CloseHandle.restype=wintypes.BOOL
         mutex=kernel.CreateMutexW(None,False,'Local\\ZDeskCompanion');already=kernel.GetLastError()==183
         show_event=kernel.CreateEventW(None,False,False,'Local\\ZDeskShowCompanion')
         if already:
@@ -573,10 +604,36 @@ if __name__=='__main__':
         if setup is None:
             sys.exit('Terminal setup canceled; no session started.')
     if console_mode:
+        if ask_background and ask_keep_running(setup[1]):
+            # Release our single-instance reservation so the separate tray process
+            # can acquire it. No capture has started in this terminal.
+            if mutex:
+                kernel.CloseHandle(mutex);mutex=None
+            if show_event:
+                kernel.CloseHandle(show_event);show_event=None
+            from background_session import launch
+            try:started=launch(setup,saved=saved_terminal,remember=remember_terminal)
+            except Exception as exc:sys.exit(str(exc))
+            sys.exit(0 if started else 1)
         sys.exit(run_console(setup,saved=saved_terminal,remember=remember_terminal))
     root=tk.Tk()
     if start_in_tray:root.withdraw()
-    companion=Companion(root,restore=not terminal);companion.show_event=show_event
+    companion=Companion(root,restore=not (terminal or background_payload));companion.show_event=show_event
+    if background_payload:
+        from background_session import acknowledge
+        def started(path=background_payload['ready']):
+            try:acknowledge(path,True)
+            except Exception:companion.quit()
+        def failed(path=background_payload['ready']):
+            try:acknowledge(path,False)
+            finally:companion.quit()
+        try:
+            connect_in_tray(companion,(background_payload['code'],set(background_payload['selected'])),
+                saved=background_payload['saved'],remember=background_payload['remember'],
+                on_ready=started,on_failure=failed)
+        except Exception:
+            failed()
+        background_payload=None
     if terminal:
         root.update_idletasks()
         if start_in_tray:connect_in_tray(companion,setup,saved=saved_terminal,remember=remember_terminal)

@@ -202,4 +202,13 @@ class ConsoleSessionTests(unittest.TestCase):
    self.assertEqual(agent.run_console(('synthetic-passcode',set()),remember=True,write=Mock()),1)
    save.assert_not_called()
 
+
+class KeepRunningPopupTests(unittest.TestCase):
+ def test_yes_no_popup_defaults_no_and_closes_after_either_answer(self):
+  with patch('agent.tk.Tk') as window,patch('agent.messagebox.askyesno',side_effect=[True,False]) as question:
+   self.assertTrue(agent.ask_keep_running({'microphone'}))
+   self.assertFalse(agent.ask_keep_running({'microphone'}))
+  self.assertEqual(window.return_value.destroy.call_count,2)
+  self.assertTrue(all(c.kwargs['default']=='no' for c in question.call_args_list))
+  self.assertIn('visible ZDesk tray',question.call_args.args[1])
 if __name__=='__main__':unittest.main()
