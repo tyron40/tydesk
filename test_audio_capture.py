@@ -135,3 +135,55 @@ class OrderedAudioBatchTests(unittest.TestCase):
    worker=threading.Thread(target=audio_capture.run,args=('https://test.invalid','device','test-token',stop,permission,Mock()));worker.start()
    try:self.assertTrue(diagnosing.wait(1));self.assertTrue(delivered.wait(1),'Audio must upload while diagnostics are still waiting')
    finally:finish.set();stop.set();worker.join(3)
+
+class IndependentAudioSourcesTests(unittest.TestCase):
+ def test_missing_playback_does_not_block_microphone_upload(self):
+  import threading,time
+  from unittest.mock import Mock,patch
+  import audio_capture
+  backend=Mock()
+  backend.default_speaker.side_effect=RuntimeError('Error 0x80070490')
+  mic=Mock();mic.isloopback=False;backend.default_microphone.return_value=mic
+  recorder=Mock();recorder.__enter__=Mock(return_value=recorder);recorder.__exit__=Mock(return_value=False)
+  def record(**kwargs):
+   time.sleep(.01)
+   return np.zeros((4800,2))
+  recorder.record.side_effect=record;mic.recorder.return_value=recorder
+  stop=threading.Event();system=threading.Event();system.set();microphone=threading.Event();microphone.set()
+  session=Mock();session.headers={};session.__enter__=Mock(return_value=session);session.__exit__=Mock(return_value=False)
+  uploads=[];reports=[]
+  def post(url,**kwargs):
+   if url.endswith('/audio'):
+    uploads.append(kwargs);stop.set()
+   return Mock(status_code=204)
+  session.post.side_effect=post
+  with patch.object(audio_capture,'load_audio_backend',return_value=(backend,lambda:None)),patch('requests.Session',return_value=session):
+   worker=threading.Thread(target=audio_capture.run,args=('https://example.test','id','test-token',stop,system,reports.append,microphone))
+   worker.start();worker.join(2)
+   try:self.assertFalse(worker.is_alive());self.assertTrue(uploads)
+   finally:stop.set();worker.join(1)
+  self.assertEqual(uploads[0]['headers']['X-Audio-Source'],'microphone')
+  self.assertTrue(any('No usable default playback' in text for _,text in reports))
+
+ def test_microphone_open_failure_preserves_loopback_and_without_permission_never_opens_mic(self):
+  from contextlib import ExitStack
+  from unittest.mock import Mock
+  from audio_capture import open_recorders
+  backend=Mock();loop=Mock();loop.isloopback=True;backend.get_microphone.return_value=loop
+  loop.recorder.return_value.__enter__=Mock(return_value=Mock())
+  loop.recorder.return_value.__exit__=Mock(return_value=False)
+  mic=Mock();mic.isloopback=False;mic.recorder.side_effect=RuntimeError('input inaccessible')
+  backend.default_microphone.return_value=mic
+  with ExitStack() as stack:
+   opened,errors=open_recorders(backend,(True,True),stack)
+   self.assertEqual([kind for kind,_,_ in opened],['system']);self.assertIn('Microphone unavailable',errors[0])
+  backend.default_microphone.reset_mock()
+  with ExitStack() as stack:opened,errors=open_recorders(backend,(True,False),stack)
+  backend.default_microphone.assert_not_called()
+
+ def test_packet_keeps_actual_source_when_both_permissions_are_selected(self):
+  import audio_capture
+  payload,_=pcm_wav(np.zeros((4800,2)))
+  result,source=audio_capture.take_batch((10,payload,(True,True),'microphone'),queue.Queue(),(True,True),now=11,include_source=True)
+  self.assertEqual(source,'microphone');self.assertEqual(result,payload)
+  self.assertEqual(audio_capture.take_batch((10,payload,(True,True),'microphone'),queue.Queue(),(True,False),now=11,include_source=True),(None,None))

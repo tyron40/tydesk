@@ -229,3 +229,9 @@ Audio responses also include a per-stream identifier. Dashboard playback resets 
 ### Dashboard audio recording
 
 After Listen, choose Record audio, then Stop recording and Download recording. The browser records the remote playback graph, including volume adjustments, silence and network interruptions; it never requests the dashboard device microphone. Supported formats are selected at runtime (WebM/Opus, MP4 audio or Ogg, with browser default fallback). Unsupported browsers show an inline error. Recordings stay in browser memory, with a 64 MB / one-hour cap, and are not uploaded to the broker. Download before refreshing or leaving. Stopping listening, hiding the tab or switching devices finalizes the recording; switching devices cannot mix two devices in one recording. Discard releases the saved blob URL. This records the existing buffered transport; WebRTC is still pending.
+
+### Missing audio or camera hardware
+
+Playback and microphone inputs now initialize independently. If one locally selected source cannot be found or opened, the other can continue, and uploaded audio identifies the source actually captured. No additional microphone is opened when microphone permission is off. Repeated audio failures are throttled in the local terminal. Reconnect after fixing a missing default device to retry it.
+
+Windows error `0x80070490` during default audio lookup can indicate no usable default endpoint. Check Settings > System > Sound for both an output and an input. ZDesk's sharing selection does not grant Windows microphone/camera privacy access or install missing hardware. If the Windows Camera app also cannot use the camera, check the hardware privacy switch, connection, driver and Windows privacy settings. Regression tests simulate failed playback with successful microphone upload and the inverse recorder-open case; they do not verify a user's physical devices.

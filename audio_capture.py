@@ -36,14 +36,17 @@ def merge_wav(payloads):
         wav.setnchannels(2);wav.setsampwidth(2);wav.setframerate(24000);wav.writeframes(b''.join(data))
     return output.getvalue()
 
-def take_batch(first,chunks,mode,now=None):
+def take_batch(first,chunks,mode,now=None,include_source=False):
     now=time.monotonic() if now is None else now
     entries=[first]
     for _ in range(4):
         try:entries.append(chunks.get_nowait())
         except queue.Empty:break
-    payloads=[payload for stamp,payload,selected in entries if now-stamp<=3 and selected==mode]
-    return merge_wav(payloads) if payloads else None
+    valid=[entry for entry in entries if now-entry[0]<=3 and entry[2]==mode]
+    source=(valid[0][3] if len(valid[0])>3 else 'both' if all(mode) else 'microphone' if mode[1] else 'system') if valid else None
+    payloads=[entry[1] for entry in valid if len(entry)==3 or entry[3]==source]
+    result=merge_wav(payloads) if payloads else None
+    return (result,source) if include_source else result
 
 def initialize_audio_thread():
     """WASAPI requires COM on every capture thread, including after re-enabling audio."""
@@ -76,6 +79,29 @@ def sources(sc,system,microphone):
         result.append(mic)
     return result
 
+def source_error(kind, exc):
+    text=str(exc)
+    if '80070490' in text.lower() or 'no playback device' in text.lower() or 'no physical microphone' in text.lower():
+        return ('No usable default playback output. Select an output in Windows Sound settings.' if kind=='system'
+                else 'No usable default microphone. Select an input in Windows Sound settings and check microphone privacy access.')
+    return ('Playback' if kind=='system' else 'Microphone')+' unavailable: '+text[:110]
+
+
+def open_recorders(sc, mode, stack):
+    """Open only locally allowed sources, independently of each other's failures."""
+    opened=[];errors=[]
+    for allowed,kind in zip(mode,('system','microphone')):
+        if not allowed:continue
+        child=stack.enter_context(ExitStack())
+        try:
+            device=sources(sc,kind=='system',kind=='microphone')[0]
+            recorder=child.enter_context(device.recorder(samplerate=24000,channels=2,blocksize=4800))
+            opened.append((kind,recorder,child))
+        except Exception as exc:
+            child.close();errors.append(source_error(kind,exc))
+    return opened,errors
+
+
 def run(url,identity,token,stop,permission,report,microphone=None):
     import requests
     microphone=microphone or threading.Event()
@@ -84,22 +110,28 @@ def run(url,identity,token,stop,permission,report,microphone=None):
     chunks=queue.Queue(maxsize=15);done=threading.Event();state={'state':'waiting','message':'Starting shared audio capture','level':0};state_lock=threading.Lock()
     def status(kind,message,level=0):
         with state_lock:state.update(state=kind,message=message[:160],level=level)
+    reported={'message':None,'at':-float('inf')}
+    def warn(message):
+        now=time.monotonic()
+        if reported['message']!=message or now-reported['at']>=30:
+            report(('status','Shared audio: '+message[:200]))
+            reported.update(message=message,at=now)
     def upload():
         last_error=0;interrupted=False;backoff=.3
         with requests.Session() as session:
             session.headers['Authorization']='Bearer '+token
             while not stop.is_set() and not done.is_set() and active():
                 try:
-                    try:stamp,payload,mode=chunks.get(timeout=.2)
-                    except queue.Empty:payload=None
+                    try:entry=chunks.get(timeout=.2)
+                    except queue.Empty:entry=None
                     if stop.is_set() or done.is_set() or not active():return
-                    if payload is not None:
-                        current=signature();payload=take_batch((stamp,payload,mode),chunks,current)
+                    if entry is not None:
+                        current=signature();payload,source=take_batch(entry,chunks,current,include_source=True)
                         if payload is None or current!=signature() or not active():continue
                         mode=current
                         with state_lock:level=state['level']
                         r=session.post(f'{url}/api/devices/{identity}/audio',data=payload,
-                            headers={'Content-Type':'audio/wav','X-Audio-Level':str(level),'X-Audio-Source':'both' if all(mode) else 'microphone' if mode[1] else 'system'},timeout=(5,15))
+                            headers={'Content-Type':'audio/wav','X-Audio-Level':str(level),'X-Audio-Source':source},timeout=(5,15))
                         if r.status_code==401:stop.set();return
                         if r.status_code==409:stop.wait(.3);continue
                         r.raise_for_status()
@@ -128,18 +160,29 @@ def run(url,identity,token,stop,permission,report,microphone=None):
         sc,cleanup_com=load_audio_backend()
         while not stop.is_set() and active():
             try:
-                mode=signature();devices=sources(sc,*mode)
+                mode=signature()
                 with ExitStack() as stack:
-                    recorders=[stack.enter_context(device.recorder(samplerate=24000,channels=2,blocksize=4800)) for device in devices]
+                    recorders,errors=open_recorders(sc,mode,stack)
+                    if not recorders:raise RuntimeError(' '.join(errors) or 'No selected audio input is available.')
+                    if errors:warn(' '.join(errors)+' Continuing with the available source; reconnect to retry missing hardware.')
                     while active() and not stop.is_set() and signature()==mode:
                         import numpy as np
-                        parts=[recorder.record(numframes=4800) for recorder in recorders]
+                        parts=[];kinds=[];remaining=[]
+                        for kind,recorder,child in recorders:
+                            if stop.is_set() or signature()!=mode:break
+                            try:
+                                parts.append(recorder.record(numframes=4800));kinds.append(kind);remaining.append((kind,recorder,child))
+                            except Exception as exc:
+                                child.close();warn(source_error(kind,exc))
+                        recorders=remaining
                         if stop.is_set() or signature()!=mode:break
+                        if not parts:raise RuntimeError('Selected audio devices stopped. Check Windows Sound settings and reconnect.')
+                        source='both' if len(kinds)==2 else kinds[0]
                         samples=np.mean(parts,axis=0)
-                        payload,level=pcm_wav(samples);newest(chunks,(time.monotonic(),payload,mode))
-                        status('capturing','Sharing '+('system and microphone audio' if all(mode) else 'microphone / surrounding sound' if mode[1] else 'system playback audio'),level)
+                        payload,level=pcm_wav(samples);newest(chunks,(time.monotonic(),payload,mode,source))
+                        status('capturing','Sharing '+('system and microphone audio' if source=='both' else 'microphone / surrounding sound' if source=='microphone' else 'system playback audio'),level)
             except Exception as exc:
-                status('error',str(exc));report(('status','Shared audio: '+str(exc)[:140]));stop.wait(3)
+                status('error',str(exc));warn(str(exc));stop.wait(3)
     except Exception as exc:
         status('error',str(exc));report(('status','Shared audio unavailable: '+str(exc)[:140]));stop.wait(1.2)
     finally:
