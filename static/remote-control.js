@@ -25,11 +25,11 @@ class Controls{
  locate(p){this.cur=p;if(this.marker){this.marker.style.left=(p.x*100)+'%';this.marker.style.top=(p.y*100)+'%';this.marker.hidden=false}}
  down(e){
   if(!this.active()||!this.el.getAttribute('src')||![0,2].includes(e.button)&&e.pointerType==='mouse')return;
-  e.preventDefault();this.el.focus({preventScroll:true});this.el.setPointerCapture(e.pointerId);
+  e.preventDefault();if(this.mode!=='finger')this.el.focus({preventScroll:true});this.el.setPointerCapture(e.pointerId);
   const p=this.position(e);this.points.set(e.pointerId,{x:e.clientX,y:e.clientY,startX:e.clientX,startY:e.clientY,start:p,time:Date.now(),button:e.button===2?'right':'left',touch:e.pointerType==='touch'});
   if(this.points.size>1){if(this.drag)this.emit({type:'release'});this.drag=false;this.multi=true;this.scrollY=this.centroid();return}
   this.multi=false;
-  if(e.pointerType!=='touch'&&this.advanced()){this.drag=true;this.locate(p);this.emit({type:'pointer_down',...p,button:e.button===2?'right':'left'})}
+  if(e.pointerType!=='touch'&&this.advanced()&&this.mode!=='finger'){this.drag=true;this.locate(p);this.emit({type:'pointer_down',...p,button:e.button===2?'right':'left'})}
  }
  centroid(){return [...this.points.values()].reduce((sum,p)=>sum+p.y,0)/this.points.size}
  move(e){
@@ -37,6 +37,7 @@ class Controls{
   const old=this.points.get(e.pointerId),p=this.position(e);
   if(!old){if(e.pointerType==='mouse'&&this.advanced()){this.locate(p);this.emit({type:'move',...p})};return}
   e.preventDefault();const dx=e.clientX-old.x,dy=e.clientY-old.y;old.x=e.clientX;old.y=e.clientY;
+  if(this.mode==='finger'){if(this.points.size>1)return;if(Math.hypot(e.clientX-old.startX,e.clientY-old.startY)>9&&!this.drag){this.drag=true;this.emit({type:'pointer_down',...old.start,button:'left'})}if(this.drag)this.emit({type:'move',...p});return}
   if(this.multi){if(this.points.size>=2){const y=this.centroid();if(Math.abs(y-this.scrollY)>=18){this.emit({type:'scroll',amount:y>this.scrollY?1:-1});this.scrollY=y}}return}
   if(!this.advanced())return;
   const distance=Math.hypot(e.clientX-old.startX,e.clientY-old.startY);
@@ -54,10 +55,11 @@ class Controls{
   const p=this.mode==='trackpad'&&old.touch?this.cur:this.position(e),distance=Math.hypot(e.clientX-old.startX,e.clientY-old.startY);
   if(this.drag&&this.advanced())this.emit({type:'pointer_up',...p,button:old.button});
   else if(!old.touch||distance<8){this.locate(p);this.emit({type:'click',...p,button:old.touch&&Date.now()-old.time>500?'right':old.button})}
+  if(this.mode==='finger'&&this.marker)this.marker.hidden=true;
   this.drag=false;
  }
  release(){if(this.points.size||this.keys.size||this.drag)this.emit({type:'release'});this.points.clear();this.keys.clear();this.drag=false;this.multi=false}
- setMode(mode){this.release();this.mode=mode;this.el.style.touchAction=mode==='pan'?'auto':'none'}
+ setMode(mode){this.release();this.mode=mode;if(mode==='finger'&&this.marker)this.marker.hidden=true;this.el.style.touchAction=mode==='pan'?'auto':'none'}
 }
 root.ZDeskControls={Controls,point,keyName};if(typeof module!=='undefined')module.exports=root.ZDeskControls;
 })(typeof window!=='undefined'?window:globalThis);
