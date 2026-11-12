@@ -26,7 +26,7 @@ let tiles=new Map(),epoch=0,active=false,observer=null,refreshing=false;
 const visible=new Set();
 function credentials(){return typeof password==='string'&&password&&typeof dashboardUnlocked!=='undefined'&&dashboardUnlocked}
 function setColumns(){const n=cols.value;grid.style.setProperty('--wall-columns',n==='auto'?'auto-fit':n);grid.style.gridTemplateColumns=n==='auto'?'repeat(auto-fit,minmax(min(100%,290px),1fr))':`repeat(${n},minmax(0,1fr))`;}
-cols.onchange=setColumns;setColumns();
+cols.onchange=()=>{setColumns();try{localStorage.setItem('zdesk-wall-columns',cols.value)}catch(_){}};try{const saved=localStorage.getItem('zdesk-wall-columns');if(['auto','1','2','3','4'].includes(saved))cols.value=saved}catch(_){}setColumns();
 function stop(){grid.hidden=true;grid.replaceChildren();epoch++;active=false;visible.clear();if(observer){observer.disconnect();observer=null}for(const tile of tiles.values()){tile.image?.removeAttribute('src');if(tile.url)URL.revokeObjectURL(tile.url);tile.url=null;tile.pending=false;tile.pointer=null}tiles.clear();}
 function sendCommand(tile,command){if(!credentials()||!tile.device?.online||!tile.device.control)return;tile.queue.push(command);if(tile.queue.length>24)tile.queue=[{type:'release'}];flush(tile);}
 async function flush(tile){if(tile.sending||!tile.queue.length)return;tile.sending=true;try{while(tile.queue.length&&active&&credentials()){const batch=tile.queue.splice(0,24);const r=await fetch('/api/devices/'+encodeURIComponent(tile.device.id)+'/commands',{method:'POST',headers:{Authorization:'Bearer '+password,'Content-Type':'application/json'},body:JSON.stringify({commands:batch})});if(!r.ok){tile.queue=[];break}}}catch(_){tile.queue=[]}finally{tile.sending=false}}
@@ -47,5 +47,6 @@ toggle.onchange=()=>{if(toggle.checked&&credentials())start();else stop()};
 bar.querySelector('#wallRefresh').onclick=sync;
 setInterval(()=>{if(toggle.checked&&credentials()&&!active)start();if((!toggle.checked||!credentials())&&active)stop();if(active)sync()},5000);
 setInterval(poll,1100);
+setInterval(()=>{if(!active)return;for(const tile of tiles.values())if(tile.pointer?.down&&tile.device?.online&&tile.device.control)sendCommand(tile,{type:'hold'})},350);
 window.addEventListener('pagehide',stop);
 })();
