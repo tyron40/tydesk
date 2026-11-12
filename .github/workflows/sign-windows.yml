@@ -1,0 +1,72 @@
+name: Sign published Windows companion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  sign:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    environment: windows-signing
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check the release and stage its executable
+        shell: pwsh
+        run: |
+          $manifest = Get-Content downloads/windows-build.json -Raw | ConvertFrom-Json
+          if ($manifest.architecture -ne 'windows-x64' -or $manifest.unsigned -ne $true -or $manifest.sha256 -notmatch '^[a-f0-9]{64}$') {
+            throw 'Expected an unsigned Windows x64 release with a SHA-256 hash.'
+          }
+          $hash = (Get-FileHash downloads/ZDesk.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne $manifest.sha256) { throw 'The executable does not match the release manifest.' }
+          if ((Get-AuthenticodeSignature downloads/ZDesk.exe).Status -ne 'NotSigned') {
+            throw 'The input executable must be unsigned.'
+          }
+          New-Item -ItemType Directory signed | Out-Null
+          Copy-Item downloads/ZDesk.exe signed/ZDesk.exe
+      - name: Authenticate to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Apply Authenticode signature
+        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2
+        with:
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\signed\ZDesk.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Verify publisher, timestamp and final checksum
+        shell: pwsh
+        env:
+          EXPECTED_PUBLISHER: ${{ vars.ARTIFACT_SIGNING_PUBLISHER }}
+        run: |
+          $signature = Get-AuthenticodeSignature signed/ZDesk.exe
+          if ($signature.Status -ne 'Valid' -or -not $signature.TimeStamperCertificate) {
+            throw "Expected a trusted, timestamped signature. Actual status: $($signature.Status)."
+          }
+          if (-not $env:EXPECTED_PUBLISHER -or $signature.SignerCertificate.Subject -cne $env:EXPECTED_PUBLISHER) {
+            throw 'The signer does not match the configured publisher subject.'
+          }
+          $manifest = Get-Content downloads/windows-build.json -Raw | ConvertFrom-Json
+          $manifest | Add-Member -NotePropertyName unsigned_sha256 -NotePropertyValue $manifest.sha256
+          $manifest | Add-Member -NotePropertyName publisher -NotePropertyValue $signature.SignerCertificate.Subject
+          $manifest.sha256 = (Get-FileHash signed/ZDesk.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest.unsigned = $false
+          $manifest | ConvertTo-Json | Set-Content signed/windows-build.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZDesk-Windows-signed
+          path: signed/
+          if-no-files-found: error
