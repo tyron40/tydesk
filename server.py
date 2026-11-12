@@ -154,7 +154,7 @@ def enroll():
 @admin
 def listing():
     with lock:
-        return jsonify([dict(id=k, name=d['name'], online=time.time()-d['seen'] < 8,
+        return jsonify([dict(id=k, name=d['name'], online=time.time()-d['seen'] < 20,
             camera=d.get('camera',False), control=d['control'], audio=d['audio'], files=d['files'], protocol=d['protocol'],
             platform=d.get('platform','unknown'), removal_supported=d.get('removal_supported',False),
             removal_state=('expired' if d.get('removal',{}).get('state') in ('pending','confirmation_required') and time.time()>d['removal']['expires']+(120 if d['removal']['state']=='confirmation_required' else 0) else d.get('removal',{}).get('state'))) for k,d in devices.items()])
@@ -187,7 +187,7 @@ def frame_upload(identity):
 def frame_download(identity):
     with lock:
         d = devices.get(identity)
-        if not d or time.time()-d['seen'] >= 8 or not d['frame']: abort(404)
+        if not d or time.time()-d['seen'] >= 20 or not d['frame']: abort(404)
         return Response(d['frame'], mimetype='image/jpeg',headers={'X-Remote-Cursor':d['cursor']})
 
 @app.get('/api/devices/<identity>/commands')
