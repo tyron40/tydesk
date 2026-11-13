@@ -37,7 +37,7 @@ class Controls{
   const old=this.points.get(e.pointerId),p=this.position(e);
   if(!old){if(e.pointerType==='mouse'&&this.advanced()){this.locate(p);this.emit({type:'move',...p})};return}
   e.preventDefault();const dx=e.clientX-old.x,dy=e.clientY-old.y;old.x=e.clientX;old.y=e.clientY;
-  if(this.mode==='finger'){if(this.points.size>1)return;if(Math.hypot(e.clientX-old.startX,e.clientY-old.startY)>9&&!this.drag){this.drag=true;this.emit({type:'pointer_down',...old.start,button:'left'})}if(this.drag)this.emit({type:'move',...p});return}
+  if(this.mode==='finger'){if(this.points.size>1)return;if(Math.hypot(e.clientX-old.startX,e.clientY-old.startY)>4&&!this.drag){this.drag=true;this.emit({type:'pointer_down',...old.start,button:'left'})}if(this.drag)this.emit({type:'move',...p});return}
   if(this.multi){if(this.points.size>=2){const y=this.centroid();if(Math.abs(y-this.scrollY)>=18){this.emit({type:'scroll',amount:y>this.scrollY?1:-1});this.scrollY=y}}return}
   if(!this.advanced())return;
   const distance=Math.hypot(e.clientX-old.startX,e.clientY-old.startY);
