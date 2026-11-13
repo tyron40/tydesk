@@ -198,7 +198,7 @@ def frame_download(identity):
         if not d: abort(404)
         if wait and since == d.get('frame_seq', 0):
             frame_ready.wait_for(lambda: devices.get(identity) is not d or
-                d.get('frame_seq', 0) > since or time.time()-d['seen'] >= 20,
+                d.get('frame_seq', 0) != since or time.time()-d['seen'] >= 20,
                 timeout=wait)
         if devices.get(identity) is not d or time.time()-d['seen'] >= 20 or not d['frame']: abort(404)
         if since == d.get('frame_seq', 0):
