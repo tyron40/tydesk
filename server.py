@@ -13,6 +13,8 @@ ADMIN = os.environ.get('TYDESK_PASSWORD', '')
 if len(ADMIN) < 16:
     raise RuntimeError('Set TYDESK_PASSWORD to a unique password of at least 16 characters.')
 lock = threading.RLock()
+frame_ready = threading.Condition(lock)
+commands_ready = threading.Condition(lock)
 DATA = Path(os.environ.get('TYDESK_DATA', './data')).resolve()
 DATA.mkdir(parents=True, exist_ok=True)
 db = sqlite3.connect(DATA / 'tydesk.db', check_same_thread=False)
@@ -23,7 +25,7 @@ def audit(identity, event):
     db.execute('INSERT INTO audit VALUES (?,?,?)', (time.time(), identity, event))
     db.commit()
 def fresh(token, name):
-    return dict(token=token, name=name, seen=0, frame=b'', commands=deque(maxlen=50), control=False,
+    return dict(token=token, name=name, seen=0, frame=b'', frame_seq=0, commands=deque(maxlen=50), control=False,
         camera=False, camera_frame=b'', camera_seen=0, audio=False, files=False, audio_chunks=deque(maxlen=32), audio_seq=0, audio_stream=secrets.token_hex(8), share=[], protocol=1, cursor='default', audio_status={'state':'waiting','message':'Waiting for system audio'})
 if device_registry.ENABLED:
     # Durable registry is authoritative. Never resurrect locally cached revocations.
@@ -167,7 +169,9 @@ def frame_upload(identity):
         payload = request.get_data()
         if len(payload)>3*1024*1024: abort(413)
         d['frame'] = payload
+        d['frame_seq'] = d.get('frame_seq', 0) + 1
         d['seen'] = time.time()
+        frame_ready.notify_all()
         d['protocol']=2 if request.headers.get('X-TyDesk-Protocol')=='2' else 1
         cursor=request.headers.get('X-Remote-Cursor','default');d['cursor']=cursor if cursor in remote_input.CURSORS else 'default'
         d['control'] = request.headers.get('X-Allow-Control') == 'yes'
@@ -185,16 +189,35 @@ def frame_upload(identity):
 @app.get('/api/devices/<identity>/frame')
 @admin
 def frame_download(identity):
-    with lock:
+    # Wait for the NEXT image instead of repeatedly downloading the same JPEG.
+    # The legacy no-query route remains compatible with existing clients.
+    since = request.args.get('since', default=-1, type=int)
+    wait = max(0., min(request.args.get('wait', default=0., type=float) or 0., 5.))
+    with frame_ready:
         d = devices.get(identity)
-        if not d or time.time()-d['seen'] >= 20 or not d['frame']: abort(404)
-        return Response(d['frame'], mimetype='image/jpeg',headers={'X-Remote-Cursor':d['cursor']})
+        if not d: abort(404)
+        if wait and since >= d.get('frame_seq', 0):
+            frame_ready.wait_for(lambda: devices.get(identity) is not d or
+                d.get('frame_seq', 0) > since or time.time()-d['seen'] >= 20,
+                timeout=wait)
+        if devices.get(identity) is not d or time.time()-d['seen'] >= 20 or not d['frame']: abort(404)
+        if since >= d.get('frame_seq', 0):
+            return '', 204
+        return Response(d['frame'], mimetype='image/jpeg',
+            headers={'X-Remote-Cursor': d['cursor'],
+                     'X-Frame-Seq': str(d.get('frame_seq', 0))})
 
 @app.get('/api/devices/<identity>/commands')
 def commands(identity):
-    with lock:
+    # A waiting companion receives new touch input as soon as it arrives.
+    wait = max(0., min(request.args.get('wait', default=0., type=float) or 0., 8.))
+    with commands_ready:
         d = device(identity)
-        result = [c for stamp,c in d['commands'] if time.time()-stamp < 2]
+        if wait and d['control'] and not d['commands']:
+            commands_ready.wait_for(lambda: devices.get(identity) is not d or
+                bool(d['commands']) or not d['control'], timeout=wait)
+        if devices.get(identity) is not d: abort(404)
+        result = [c for stamp,c in d['commands'] if time.time()-stamp < 3]
         d['commands'].clear()
         return jsonify(result if d['control'] else [])
 
@@ -208,13 +231,14 @@ def command(identity):
     except ValueError:abort(400)
     with lock:
         d=devices.get(identity)
-        if not d or not d['control'] or time.time()-d['seen']>=8:abort(409)
+        if not d or not d['control'] or time.time()-d['seen']>=20:abort(409)
         for c in batch:
             if c['type']=='release':d['commands'].clear()
             if c['type']=='move' and d['commands'] and d['commands'][-1][1]['type']=='move':d['commands'].pop()
             if len(d['commands'])>=49:
                 d['commands'].clear();d['commands'].append((time.time(),{'type':'release'}))
             d['commands'].append((time.time(),c))
+        commands_ready.notify_all()
     return '',204
 
 @app.delete('/api/devices/<identity>')
