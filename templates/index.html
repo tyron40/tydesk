@@ -32,6 +32,12 @@ body.session-expanded{overflow:hidden}
  #viewer.focus-mode #screenViewport,#viewer:fullscreen #screenViewport{width:100%;overflow:auto}#screen{max-width:100%;object-fit:contain}
  .wall-toolbar{display:flex;flex-wrap:wrap;gap:8px}.wall-toolbar>*{min-width:0}.wall-toolbar label{font-size:13px}
 }
+
+/* Preserve portrait phone proportions and leave all pixels visible in Fit mode. */
+#screenViewport{min-width:0;max-width:100%;border-radius:18px;overscroll-behavior:contain}
+#screenStage{flex:0 0 auto;max-width:none;position:relative;background:#05080c}
+#screen{display:block;width:100%;height:auto;object-fit:contain;vertical-align:top}
+@media(max-width:600px){#viewer .session-tools{display:flex;flex-wrap:wrap;gap:8px}#viewer .session-tools label{flex:1 1 135px;min-width:0}#viewer .session-tools select{max-width:100%;width:100%}#screenViewport{max-height:none!important}#viewer .toolbar{overflow-wrap:anywhere}#viewer .toolbar button{white-space:normal}}
 </style>
 <header><div class="logo">Z<span>Desk</span></div><span class="tag">Personal remote workspace · Desktop + Android</span></header>
 <main class="wrap"><section id="login" class="panel"><h1>Your devices, within reach.</h1><p>Sign in to your running ZDesk server. Pair a computer using its visible companion window.</p><form id="auth"><label for="password">Server password</label><div class="row"><input id="password" type="password" required autocomplete="current-password" placeholder="Your server password"><button id="unlockButton">Unlock dashboard</button></div><p id="loginStatus" role="status" aria-live="polite" style="color:#ffce8a;overflow-wrap:anywhere"></p></form><p class="foot">Password stays in this tab’s memory. Single-owner dashboard. Remembered devices are saved in the device registry.</p></section>
@@ -85,7 +91,7 @@ $('#calculatorForm').onsubmit=async e=>{
  finally{button.disabled=false}
 };
 $('#auth').onsubmit=e=>{e.preventDefault();unlockDashboard($('#password').value)};
-function selectDevice(d){closeCamera();remoteControls.release();stopAudio();selected=d.id;selectedInfo=d;lastGoodFrame=0;$('#streamDiagnostic').textContent='Connecting to screen stream…';if(syncEnabled.checked&&syncMaster.value!==d.id){syncEnabled.checked=false;syncReport()}if(touchBrowser)chooseInputMode('finger');$('#uninstallSession').disabled=!canUninstall(d);$('#upgrade').hidden=d.protocol>=2;$('#remotePointer').hidden=true;$('#sharedFiles').replaceChildren();$('#transfers').replaceChildren();$('#viewer').hidden=false;$('#viewName').textContent=d.name;$('#viewer').scrollIntoView({behavior:'smooth'});}
+function selectDevice(d){closeCamera();remoteControls.release();stopAudio();selected=d.id;selectedInfo=d;lastGoodFrame=0;$('#streamDiagnostic').textContent='Connecting to screen stream…';if(syncEnabled.checked&&syncMaster.value!==d.id){syncEnabled.checked=false;syncReport()}if(touchBrowser)chooseInputMode('finger');$('#uninstallSession').disabled=!canUninstall(d);$('#upgrade').hidden=d.protocol>=2;$('#remotePointer').hidden=true;$('#sharedFiles').replaceChildren();$('#transfers').replaceChildren();$('#viewer').hidden=false;$('#viewName').textContent=d.name;$('#viewer').scrollIntoView({behavior:'smooth'});requestAnimationFrame(scaleScreen);}
 const sessionWindows=new Map();
 function openSessionWindow(d){
  for(const [w] of sessionWindows)if(w.closed)sessionWindows.delete(w);
@@ -116,7 +122,7 @@ async function renderFrame(){if(!selected||busy||!password||document.hidden)retu
  const blob=await r.blob();if(!blob.size||!blob.type.startsWith('image/'))throw Error('Device returned an invalid screen image.');
  if(identity===selected){const u=URL.createObjectURL(blob);const img=new Image();try{await img.decode?.call(Object.assign(img,{src:u}))}catch(_){URL.revokeObjectURL(u);throw Error('Received screen frame could not be decoded.')}
  if(identity!==selected){URL.revokeObjectURL(u);return}
- $('#screen').src=u;$('#screen').style.cursor=remoteControls.mode==='finger'?'none':(selectedInfo?.control?(r.headers.get('X-Remote-Cursor')||'default'):'default');if(frameURL)URL.revokeObjectURL(frameURL);frameURL=u;lastGoodFrame=Date.now();$('#streamDiagnostic').textContent='Screen live · '+img.naturalWidth+' × '+img.naturalHeight;}
+ $('#screen').src=u;$('#screen').style.cursor=remoteControls.mode==='finger'?'none':(selectedInfo?.control?(r.headers.get('X-Remote-Cursor')||'default'):'default');if(frameURL)URL.revokeObjectURL(frameURL);frameURL=u;lastGoodFrame=Date.now();if($('#screen').naturalWidth!==img.naturalWidth||$('#screen').naturalHeight!==img.naturalHeight){}scaleScreen();$('#streamDiagnostic').textContent='Screen live · '+img.naturalWidth+' × '+img.naturalHeight;}
  }catch(e){if(identity===selected){$('#streamDiagnostic').textContent=e.message+(lastGoodFrame?' · Last successful frame retained.':'');if(Date.now()-lastStreamWarning>10000){notice(e.message);lastStreamWarning=Date.now()}}}finally{busy=false}}
 let cameraOpen=false,cameraURL=null,cameraBusy=false,cameraGeneration=0;
 function closeCamera(){cameraOpen=false;cameraGeneration++;$('#cameraImage').hidden=true;$('#cameraImage').removeAttribute('src');if(cameraURL)URL.revokeObjectURL(cameraURL);cameraURL=null;$('#cameraToggle').textContent='Open camera view';$('#cameraStatus').textContent='Enable camera sharing locally in the companion.'}
@@ -154,7 +160,7 @@ $('#touchMode').onchange=e=>chooseInputMode(e.target.value);
 const touchBrowser=window.matchMedia('(pointer:coarse)').matches;
 
 function expandedSession(){return $('#viewer').classList.contains('focus-mode')||document.fullscreenElement===$('#viewer')}
-function scaleScreen(){const value=$('#screenScale').value,screen=$('#screen'),viewport=$('#screenViewport');let width=value==='fit'?'100%':value==='native'?(screen.naturalWidth||1600)+'px':(Number(value)*100)+'%';if(value==='fit'&&expandedSession()&&viewport.clientWidth&&viewport.clientHeight&&screen.naturalWidth&&screen.naturalHeight)width=Math.min(viewport.clientWidth,viewport.clientHeight*screen.naturalWidth/screen.naturalHeight)+'px';$('#screenStage').style.width=width;viewport.style.justifyContent=value==='fit'?'center':'flex-start';viewport.style.alignItems=value==='fit'?'center':'flex-start'}
+function scaleScreen(){const value=$('#screenScale').value,screen=$('#screen'),viewport=$('#screenViewport'),stage=$('#screenStage');const naturalW=screen.naturalWidth||600,naturalH=screen.naturalHeight||1200;const fit=value==='fit';const availableW=Math.max(180,viewport.clientWidth-4);const availableH=Math.max(200,Math.min(window.innerHeight*.68,900));const ratio=naturalW/naturalH;const fittedW=Math.min(availableW,availableH*ratio);const width=fit?fittedW:value==='native'?naturalW:availableW*Number(value);stage.style.width=Math.max(1,Math.round(width))+'px';stage.style.minHeight='0';screen.style.display='block';screen.style.width='100%';screen.style.height='auto';screen.style.maxWidth='none';screen.style.aspectRatio=naturalW+' / '+naturalH;viewport.style.display='flex';viewport.style.justifyContent=fit?'center':'flex-start';viewport.style.alignItems='flex-start';viewport.style.maxHeight=fit?'none':'70dvh';viewport.style.overflow=fit?'hidden':'auto';stage.style.borderRadius=ratio<.85?'24px':'10px';stage.style.overflow='hidden'}
 function syncExpansion(){const expanded=expandedSession();document.body?.classList.toggle('session-expanded',expanded);$('#fullscreen').textContent=expanded?'Exit full screen':'Full screen';scaleScreen()}
 $('#sessionTools').onclick=()=>{const viewer=$('#viewer'),open=!viewer.classList.contains('tools-open');viewer.classList.toggle('tools-open',open);$('#sessionTools').setAttribute('aria-expanded',String(open));if(!expandedSession())$('#touchMode').focus();scaleScreen()};
 window.addEventListener('resize',scaleScreen);document.addEventListener('fullscreenchange',syncExpansion);
