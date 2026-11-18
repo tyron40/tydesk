@@ -6,27 +6,77 @@ import android.os.Bundle;
 import org.json.*;
 public class ControlService extends AccessibilityService {
  static volatile ControlService current;
- long lastInput=0,dragStarted=0;Path drag;float x=.5f,y=.5f,strokeX=.5f,strokeY=.5f;boolean ctrl=false;GestureDescription.StrokeDescription liveStroke;boolean gestureBusy=false;float queuedX,queuedY;boolean queuedMove=false,finishDrag=false;
+ long lastInput=0;float x=.5f,y=.5f;boolean ctrl=false;
+ final android.os.Handler main=new android.os.Handler(android.os.Looper.getMainLooper());
+ final Runnable idleRelease=this::releaseTouch;
+ GestureDescription.StrokeDescription liveStroke;
+ float strokeX,strokeY,nextX,nextY;
+ int generation,strokeWidth,strokeHeight;
+ boolean gestureBusy,pending,ending;
  protected void onServiceConnected(){current=this;}
  public void onAccessibilityEvent(AccessibilityEvent e){}
- public void onInterrupt(){resetDrag();ctrl=false;}
- public void onDestroy(){current=null;super.onDestroy();}
- void resetDrag(){drag=null;liveStroke=null;gestureBusy=false;queuedMove=false;finishDrag=false;}
- void gesture(Path path,long duration){dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,Math.max(1,duration))).build(),null,null);}
- void dispatchLive(GestureDescription.StrokeDescription stroke){gestureBusy=true;boolean started=dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(),new GestureResultCallback(){@Override public void onCompleted(GestureDescription g){gestureBusy=false;if(queuedMove){float nx=queuedX,ny=queuedY;boolean end=finishDrag;queuedMove=false;continueDrag(nx,ny,end);}else if(finishDrag)resetDrag();}@Override public void onCancelled(GestureDescription g){resetDrag();}},null);if(!started)resetDrag();}
- void continueDrag(float nx,float ny,boolean end){if(liveStroke==null)return;if(gestureBusy){queuedX=nx;queuedY=ny;queuedMove=true;finishDrag|=end;return;}Path segment=new Path();segment.moveTo(px(strokeX),py(strokeY));segment.lineTo(px(nx),py(ny));strokeX=nx;strokeY=ny;try{liveStroke=liveStroke.continueStroke(segment,0,end?55:95,!end);dispatchLive(liveStroke);}catch(Exception ex){resetDrag();}}
+ public void onInterrupt(){releaseTouch();ctrl=false;}
+ public void onDestroy(){releaseTouch();current=null;super.onDestroy();}
+ boolean allowed(){return ShareService.active&&ShareService.projectionActive&&ShareService.allowControl;}
+ void resetTouch(){generation++;main.removeCallbacks(idleRelease);liveStroke=null;gestureBusy=false;pending=false;ending=false;}
+ void gesture(Path path,long duration){resetTouch();dispatchGesture(new GestureDescription.Builder().addStroke(new GestureDescription.StrokeDescription(path,0,Math.max(1,duration))).build(),null,null);}
+ void armRelease(){main.removeCallbacks(idleRelease);main.postDelayed(idleRelease,850);}
+ void releaseTouch(){
+  if(liveStroke==null)return;
+  ending=true;pending=true;nextX=strokeX;nextY=strokeY;
+  flushTouch();
+ }
+ void dispatchLive(GestureDescription.StrokeDescription stroke,boolean finalSegment){
+  gestureBusy=true;int ticket=generation;
+  boolean sent=dispatchGesture(new GestureDescription.Builder().addStroke(stroke).build(),new GestureResultCallback(){
+   @Override public void onCompleted(GestureDescription g){
+    if(ticket!=generation)return;
+    gestureBusy=false;
+    if(finalSegment){resetTouch();return;}
+    if(!allowed()||strokeWidth!=ShareService.deviceWidth||strokeHeight!=ShareService.deviceHeight)releaseTouch();
+    else flushTouch();
+   }
+   @Override public void onCancelled(GestureDescription g){if(ticket==generation)resetTouch();}
+  },main);
+  if(!sent)resetTouch();
+ }
+ void beginTouch(float nx,float ny){
+  resetTouch();strokeWidth=ShareService.deviceWidth;strokeHeight=ShareService.deviceHeight;
+  strokeX=px(nx);strokeY=py(ny);
+  Path start=new Path();start.moveTo(strokeX,strokeY);
+  liveStroke=new GestureDescription.StrokeDescription(start,0,16,true);
+  armRelease();dispatchLive(liveStroke,false);
+ }
+ void queueTouch(float nx,float ny,boolean end){
+  if(liveStroke==null||ending)return;
+  if(strokeWidth!=ShareService.deviceWidth||strokeHeight!=ShareService.deviceHeight){releaseTouch();return;}
+  nextX=px(nx);nextY=py(ny);pending=true;ending=end;
+  if(!end)armRelease();else main.removeCallbacks(idleRelease);
+  flushTouch();
+ }
+ void flushTouch(){
+  if(liveStroke==null||gestureBusy||!pending)return;
+  if(!allowed()){ending=true;nextX=strokeX;nextY=strokeY;}
+  boolean end=ending;pending=false;
+  Path segment=new Path();segment.moveTo(strokeX,strokeY);
+  if(nextX!=strokeX||nextY!=strokeY)segment.lineTo(nextX,nextY);
+  try{
+   liveStroke=liveStroke.continueStroke(segment,0,end?16:32,!end);
+   strokeX=nextX;strokeY=nextY;dispatchLive(liveStroke,end);
+  }catch(IllegalArgumentException|IllegalStateException ex){resetTouch();}
+ }
  float px(float x){return x*Math.max(1,ShareService.deviceWidth-1);}float py(float y){return y*Math.max(1,ShareService.deviceHeight-1);}
  void execute(JSONObject c){
-  if(!ShareService.active||!ShareService.projectionActive||!ShareService.allowControl)return;
-  long now=android.os.SystemClock.elapsedRealtime();if(now-lastInput>1500){resetDrag();ctrl=false;}lastInput=now;
+  if(!allowed()){releaseTouch();return;}
+  long now=android.os.SystemClock.elapsedRealtime();if(now-lastInput>1500)ctrl=false;lastInput=now;
   String type=c.optString("type"),key=c.optString("key");
-  if(type.equals("release")){if(liveStroke!=null){finishDrag=true;continueDrag(x,y,true);}else resetDrag();ctrl=false;return;}
-  if(type.equals("hold"))return;
+  if(type.equals("release")){releaseTouch();ctrl=false;return;}
+  if(type.equals("hold")){if(liveStroke!=null&&!ending)armRelease();return;}
   if(type.equals("click")||type.equals("move")||type.equals("pointer_down")||type.equals("pointer_up")){
    x=Math.max(0,Math.min(1,(float)c.optDouble("x",.5)));y=Math.max(0,Math.min(1,(float)c.optDouble("y",.5)));
-   if(type.equals("pointer_down")){resetDrag();dragStarted=now;drag=new Path();drag.moveTo(px(x),py(y));strokeX=x;strokeY=y;if(android.os.Build.VERSION.SDK_INT>=26){liveStroke=new GestureDescription.StrokeDescription(drag,0,250,true);dispatchLive(liveStroke);}}
-   else if(type.equals("move")){if(drag!=null){if(android.os.Build.VERSION.SDK_INT>=26){continueDrag(x,y,false);}else drag.lineTo(px(x),py(y));}}
-   else if(type.equals("pointer_up")){if(drag!=null){if(android.os.Build.VERSION.SDK_INT>=26){finishDrag=true;continueDrag(x,y,true);}else{drag.lineTo(px(x),py(y));gesture(drag,Math.min(450,Math.max(100,now-lastInput+150)));resetDrag();}}}
+   if(type.equals("pointer_down"))beginTouch(x,y);
+   else if(type.equals("move"))queueTouch(x,y,false);
+   else if(type.equals("pointer_up"))queueTouch(x,y,true);
    else{Path p=new Path();p.moveTo(px(x),py(y));gesture(p,c.optString("button").equals("right")?650:35);}
    return;
   }
