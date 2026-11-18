@@ -6,7 +6,7 @@ import android.os.Bundle;
 import org.json.*;
 public class ControlService extends AccessibilityService {
  static volatile ControlService current;
- long lastInput=0;Path drag;float x=.5f,y=.5f,strokeX=.5f,strokeY=.5f;boolean ctrl=false;GestureDescription.StrokeDescription liveStroke;boolean gestureBusy=false;float queuedX,queuedY;boolean queuedMove=false,finishDrag=false;
+ long lastInput=0,dragStarted=0;Path drag;float x=.5f,y=.5f,strokeX=.5f,strokeY=.5f;boolean ctrl=false;GestureDescription.StrokeDescription liveStroke;boolean gestureBusy=false;float queuedX,queuedY;boolean queuedMove=false,finishDrag=false;
  protected void onServiceConnected(){current=this;}
  public void onAccessibilityEvent(AccessibilityEvent e){}
  public void onInterrupt(){resetDrag();ctrl=false;}
@@ -24,10 +24,10 @@ public class ControlService extends AccessibilityService {
   if(type.equals("hold"))return;
   if(type.equals("click")||type.equals("move")||type.equals("pointer_down")||type.equals("pointer_up")){
    x=Math.max(0,Math.min(1,(float)c.optDouble("x",.5)));y=Math.max(0,Math.min(1,(float)c.optDouble("y",.5)));
-   if(type.equals("pointer_down")){resetDrag();drag=new Path();drag.moveTo(px(x),py(y));strokeX=x;strokeY=y;if(android.os.Build.VERSION.SDK_INT>=26){liveStroke=new GestureDescription.StrokeDescription(drag,0,250,true);dispatchLive(liveStroke);}}
+   if(type.equals("pointer_down")){resetDrag();dragStarted=now;drag=new Path();drag.moveTo(px(x),py(y));strokeX=x;strokeY=y;if(android.os.Build.VERSION.SDK_INT>=26){liveStroke=new GestureDescription.StrokeDescription(drag,0,250,true);dispatchLive(liveStroke);}}
    else if(type.equals("move")){if(drag!=null){if(android.os.Build.VERSION.SDK_INT>=26){continueDrag(x,y,false);}else drag.lineTo(px(x),py(y));}}
    else if(type.equals("pointer_up")){if(drag!=null){if(android.os.Build.VERSION.SDK_INT>=26){finishDrag=true;continueDrag(x,y,true);}else{drag.lineTo(px(x),py(y));gesture(drag,Math.min(450,Math.max(100,now-lastInput+150)));resetDrag();}}}
-   else{Path p=new Path();p.moveTo(px(x),py(y));gesture(p,c.optString("button").equals("right")?650:60);}
+   else{Path p=new Path();p.moveTo(px(x),py(y));gesture(p,c.optString("button").equals("right")?650:35);}
    return;
   }
   if(type.equals("scroll")){Path p=new Path();p.moveTo(px(.5f),py(.5f));p.lineTo(px(.5f),py(c.optDouble("amount")>0?.8f:.2f));gesture(p,220);return;}

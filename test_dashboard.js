@@ -77,3 +77,12 @@ function wave(frames=4800){const b=Buffer.alloc(44+frames*4);b.write('RIFF');b.w
  const chunks=Array.from({length:8},(_,i)=>({seq:i+1,wav:pcm}));assert.deepEqual(recentChunks(chunks).map(x=>x.seq),[4,5,6,7,8]);
  console.log('PASS: jittered packet arrivals play contiguously, no normal backlog dropping, bounded initial live playback and outage rebuffering');
 })().catch(e=>{console.error(e);process.exit(1)});
+
+{
+ const f=fixture();f.control.setMode('finger');
+ f.control.move(f.e(1,110,70,'mouse'));
+ assert.equal(f.sent.length,0,'Phone mode must not send hover traffic');
+ f.control.down(f.e(1,60,40));f.control.up(f.e(1,160,90));
+ assert.deepEqual(f.sent.map(v=>v.type),['pointer_down','pointer_up'],'A quick swipe without a move event must still reach the phone');
+ assert(f.sent[0].y<f.sent[1].y);
+}

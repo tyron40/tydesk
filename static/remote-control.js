@@ -35,7 +35,7 @@ class Controls{
  move(e){
   if(!this.active()||!this.el.getAttribute('src'))return;
   const old=this.points.get(e.pointerId),p=this.position(e);
-  if(!old){if(e.pointerType==='mouse'&&this.advanced()){this.locate(p);this.emit({type:'move',...p})};return}
+  if(!old){if(this.mode!=='finger'&&e.pointerType==='mouse'&&this.advanced()){this.locate(p);this.emit({type:'move',...p})};return}
   e.preventDefault();const dx=e.clientX-old.x,dy=e.clientY-old.y;old.x=e.clientX;old.y=e.clientY;
   if(this.mode==='finger'){if(this.points.size>1)return;if(Math.hypot(e.clientX-old.startX,e.clientY-old.startY)>4&&!this.drag){this.drag=true;this.emit({type:'pointer_down',...old.start,button:'left'})}if(this.drag)this.emit({type:'move',...p});return}
   if(this.multi){if(this.points.size>=2){const y=this.centroid();if(Math.abs(y-this.scrollY)>=18){this.emit({type:'scroll',amount:y>this.scrollY?1:-1});this.scrollY=y}}return}
@@ -53,6 +53,7 @@ class Controls{
   const old=this.points.get(e.pointerId);if(!old)return;e.preventDefault();this.points.delete(e.pointerId);
   if(this.multi){if(!this.points.size){this.multi=false;this.drag=false}return}
   const p=this.mode==='trackpad'&&old.touch?this.cur:this.position(e),distance=Math.hypot(e.clientX-old.startX,e.clientY-old.startY);
+  if(this.mode==='finger'&&this.advanced()&&!this.drag&&distance>4){this.drag=true;this.emit({type:'pointer_down',...old.start,button:old.button})}
   if(this.drag&&this.advanced())this.emit({type:'pointer_up',...p,button:old.button});
   else if(!old.touch||distance<8){this.locate(p);this.emit({type:'click',...p,button:old.touch&&Date.now()-old.time>500?'right':old.button})}
   if(this.mode==='finger'&&this.marker)this.marker.hidden=true;
