@@ -2,9 +2,9 @@ const assert=require('node:assert/strict');
 global.setInterval=()=>0;
 const {Controls,point,keyName}=require('./static/remote-control.js');
 const {pcmWave,Player}=require('./static/system-audio.js');
-function fixture(){
+function fixture(changeView,enabled=()=>true){
  const sent=[],listeners={};const el={style:{},addEventListener:(name,fn)=>listeners[name]=fn,getAttribute:()=>'/frame',focus(){},setPointerCapture(){},getBoundingClientRect:()=>({left:10,top:20,width:200,height:100})};
- const control=new Controls(el,{send:c=>sent.push(c),enabled:()=>true,advanced:()=>true,marker:{style:{},hidden:true}});
+ const control=new Controls(el,{send:c=>sent.push(c),enabled,changeView,advanced:()=>true,marker:{style:{},hidden:true}});
  const e=(id,x,y,type='touch',button=0)=>({pointerId:id,clientX:x,clientY:y,pointerType:type,button,preventDefault(){}});
  return{sent,control,listeners,e};
 }
@@ -37,6 +37,16 @@ function fixture(){
  const f=fixture();f.control.setMode('trackpad');f.control.down(f.e(1,30,40));f.control.move(f.e(1,31,41));assert.equal(f.sent.length,0,'Small touch jitter should not move the pointer');
  f.control.points.get(1).time-=600;f.control.move(f.e(1,70,50));f.control.up(f.e(1,70,50));
  assert.deepEqual(f.sent.map(v=>v.type),['pointer_down','move','pointer_up'],'Hold then move drags in trackpad mode');
+}
+{
+ const changes=[], f=fixture((a,b)=>changes.push(b.d/a.d));f.control.setMode('finger');
+ f.control.down(f.e(1,40,50));f.control.down(f.e(2,80,50));f.control.move(f.e(2,120,50));f.control.move(f.e(2,60,50));
+ f.control.up(f.e(2,60,50));f.listeners.lostpointercapture(f.e(2,60,50));f.control.move(f.e(1,65,50));f.control.up(f.e(1,65,50));
+ assert.deepEqual(changes,[2,.25]);assert.deepEqual(f.sent,[],'Pinching and lifting one finger must not send remote input');
+ f.control.down(f.e(3,50,50));f.control.up(f.e(3,50,50));assert.equal(f.sent[0].type,'click');
+ const local=fixture((a,b)=>changes.push(b.d/a.d),()=>false);
+ local.control.down(local.e(1,40,50));local.control.down(local.e(2,80,50));local.control.move(local.e(2,120,50));
+ assert.equal(changes.at(-1),2);assert.deepEqual(local.sent,[],'Pinch also works in view-only sessions');
 }
 function wave(frames=4800){const b=Buffer.alloc(44+frames*4);b.write('RIFF');b.writeUInt32LE(b.length-8,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(2,22);b.writeUInt32LE(24000,24);b.writeUInt32LE(96000,28);b.writeUInt16LE(4,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(b.length-44,40);for(let i=0;i<frames;i++){const v=Math.round(Math.sin(i/24000*2*Math.PI*440)*10000);b.writeInt16LE(v,44+i*4);b.writeInt16LE(v,46+i*4)}return b}
 (async()=>{
